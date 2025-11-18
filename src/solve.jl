@@ -31,6 +31,10 @@ function solve(
     end
     
     # Main loop
+    old_fx = fx(state)  # Track for ftol convergence
+    rejected_steps = 0  # Track consecutive rejections
+    max_consecutive_rejections = 10  # Stagnation threshold
+    
     for iter in 1:options.maxiter
         state.iter = iter
         
@@ -52,20 +56,41 @@ function solve(
         
         # Accept or reject step
         if rho > options.eta1
+            rejected_steps = 0  # Reset rejection counter
             accept_step!(state, hessian_update, prob.f, prob.adtype, options, rho)
             
+            # Store function value change for convergence check
+            fx_change = abs(fx(state) - old_fx)
+            old_fx = fx(state)
+
+            
             # Check convergence
-            conv_result = check_convergence(state, iter, options)
+            conv_result = check_convergence(state, iter, options, fx_change)
             if conv_result !== nothing
                 return conv_result
             end
         else
+            rejected_steps += 1
             if options.verbose
                 println("Iter $iter: step rejected, ρ = $rho, Δ = $(state.tr_radius)")
             end
+            
+            # Check for stagnation (too many consecutive rejections)
+            if rejected_steps >= max_consecutive_rejections
+                if options.verbose
+                    println("Optimization stagnated: $rejected_steps consecutive rejections")
+                end
+                return TrustRegionResult(
+                    state.x, fx(state), copy(gx(state)), iter,
+                    state.f_evals, state.g_evals, state.h_evals,
+                    false, :stagnation
+                )
+            end
         end
         
-        if state.tr_radius < options.xtol
+        # Check if trust region became too small (use machine epsilon scaled by initial radius)
+        min_tr_radius = max(options.xtol, sqrt(eps(T)) * options.initial_tr_radius)
+        if state.tr_radius < min_tr_radius
             return TrustRegionResult(
                 state.x, fx(state), copy(gx(state)), iter,
                 state.f_evals, state.g_evals, state.h_evals, 
@@ -201,26 +226,50 @@ function accept_step!(state::TrustRegionState, hessian_update, f, adtype, option
 end
 
 """Check convergence criteria"""
-function check_convergence(state::TrustRegionState{T}, iter::Int, options) where T
+function check_convergence(state::TrustRegionState{T}, iter::Int, options, fx_change::T) where T
     gnorm = norm(state.gx_free, Inf)
     step_norm = state.last_step_norm
+    current_fx = fx(state)
     
-    # Gradient convergence
+    # Gradient convergence (primary criterion)
     if gnorm ≤ options.gtol
         return TrustRegionResult(
-            state.x, fx(state), copy(gx(state)), iter, 
+            state.x, current_fx, copy(gx(state)), iter, 
             state.f_evals, state.g_evals, state.h_evals, 
             true, :gtol
         )
     end
     
-    # Step size convergence
-    if step_norm ≤ options.xtol && options.xtol > 0
-        return TrustRegionResult(
-            state.x, fx(state), copy(gx(state)), iter,
-            state.f_evals, state.g_evals, state.h_evals, 
-            true, :xtol
-        )
+    # Function value convergence (absolute and relative)
+    # Use both absolute and relative tolerance for robustness
+    if options.ftol > 0
+        ftol_abs = fx_change
+        ftol_rel = fx_change / (abs(current_fx) + eps(T))
+        
+        if ftol_abs ≤ options.ftol || ftol_rel ≤ options.ftol
+            # Only declare convergence if gradient is also reasonably small
+            # This prevents false convergence in flat regions
+            if gnorm ≤ sqrt(options.gtol)
+                return TrustRegionResult(
+                    state.x, current_fx, copy(gx(state)), iter,
+                    state.f_evals, state.g_evals, state.h_evals, 
+                    true, :ftol
+                )
+            end
+        end
+    end
+    
+    # Step size convergence (with gradient check to avoid false convergence)
+    if options.xtol > 0 && step_norm ≤ options.xtol
+        # Only stop if gradient is also small (within 100x of gtol)
+        # Otherwise we might be stuck in a bad region
+        if gnorm ≤ T(100) * options.gtol
+            return TrustRegionResult(
+                state.x, current_fx, copy(gx(state)), iter,
+                state.f_evals, state.g_evals, state.h_evals, 
+                true, :xtol
+            )
+        end
     end
     
     return nothing  # No convergence yet
