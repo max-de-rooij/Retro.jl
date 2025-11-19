@@ -19,7 +19,7 @@ export CauchyPointFallback, EigenvalueFallback
 export analyze_result
 
 using Reexport
-@reexport using DifferentiationInterface: AutoForwardDiff, AutoReverseDiff, AutoZygote, AutoFiniteDifferences
+@reexport using DifferentiationInterface: AutoForwardDiff, AutoReverseDiff, AutoZygote
 # ============================================================================
 # Extended Result Analysis
 # ============================================================================
