@@ -48,14 +48,14 @@ end
 # Problem Definition (SciML-style)
 # ============================================================================
 
-struct FidesProblem{F, X, ADT, LB, UB}
+struct RetroProblem{F, X, ADT, LB, UB}
     f::F                      # Objective function
     x0::X                     # Initial conditions
     adtype::ADT              # AD backend
     lb::LB                   # Lower bounds (nothing or vector)  
     ub::UB                   # Upper bounds (nothing or vector)
     
-    function FidesProblem(f::F, x0::X, adtype::ADT; 
+    function RetroProblem(f::F, x0::X, adtype::ADT; 
                          lb::LB=nothing, ub::UB=nothing) where {F, X, ADT, LB, UB}
         # Validate bounds
         if lb !== nothing && length(lb) != length(x0)

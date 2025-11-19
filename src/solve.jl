@@ -1,5 +1,5 @@
 function solve(
-    prob::FidesProblem, 
+    prob::RetroProblem, 
     hessian_update::AbstractHessianUpdate,
     subproblem_solver::AbstractSubproblemSolver;
     options::TrustRegionOptions = TrustRegionOptions()
@@ -149,7 +149,7 @@ function compute_gradient!(f, diff_result::DiffResults.MutableDiffResult, ::Auto
     return diff_result
 end
 
-function initialize_state(prob::FidesProblem, x0, hessian_update::ExactHessian, options)
+function initialize_state(prob::RetroProblem, x0, ::ExactHessian, options)
     T = eltype(x0)
     n = length(x0)
     
@@ -168,8 +168,8 @@ function initialize_state(prob::FidesProblem, x0, hessian_update::ExactHessian, 
     return state
 end
 
-function initialize_state(prob::FidesProblem, x0, 
-                         hessian_update::Union{BFGSUpdate, SR1Update}, options)
+function initialize_state(prob::RetroProblem, x0, 
+                         ::Union{BFGSUpdate, SR1Update}, options)
     T = eltype(x0)
     n = length(x0)
     
