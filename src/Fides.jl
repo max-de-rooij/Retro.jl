@@ -17,6 +17,8 @@ export BFGSUpdate, SR1Update, ExactHessian
 export TwoDimSubspace, CGSubspace, FullSpace
 export analyze_result
 
+using Reexport
+@reexport using DifferentiationInterface: AutoForwardDiff, AutoReverseDiff, AutoZygote
 # ============================================================================
 # Extended Result Analysis
 # ============================================================================
@@ -29,7 +31,7 @@ Provide detailed analysis of optimization result.
 function analyze_result(result::TrustRegionResult)
     println("=== Fides Optimization Result ===")
     println("Converged: $(result.converged)")
-    println("Convergence reason: $(result.convergence_reason)")
+    println("Convergence reason: $(result.termination_reason)")
     println("Final objective value: $(result.fx)")
     println("Final gradient norm (∞): $(norm(result.gx, Inf))")
     println("Iterations: $(result.iterations)")

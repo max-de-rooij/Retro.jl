@@ -124,38 +124,37 @@ function solve_2d_trust_region(g1::T, g2::T, h11::T, h22::T, h12::T, tr_radius::
         s1 = -inv_det * (h22 * g1 - h12 * g2)
         s2 = -inv_det * (-h12 * g1 + h11 * g2)
         
-        # Check if Newton step is within trust region
+        # Check if Newton step is descent direction (model_value < 0)
+        model_value = g1*s1 + g2*s2 + 0.5*(h11*s1^2 + 2*h12*s1*s2 + h22*s2^2)
         s_norm_sq = s1^2 + s2^2
-        if s_norm_sq ≤ tr_radius^2
-            return s1, s2
-        end
-    end
-    
-    # Newton step outside trust region or H singular
-    # Scale Newton step (or gradient if H singular) to trust region boundary
-    
-    # Try to compute Newton direction
-    det_H = h11 * h22 - h12 * h12
-    if abs(det_H) > eps(T) * max(abs(h11), abs(h22), one(T))
-        inv_det = one(T) / det_H
-        newton_s1 = -inv_det * (h22 * g1 - h12 * g2)
-        newton_s2 = -inv_det * (-h12 * g1 + h11 * g2)
-        newton_norm = sqrt(newton_s1^2 + newton_s2^2)
         
-        if newton_norm > eps(T)
-            # Scale to trust region boundary
-            scale = tr_radius / newton_norm
-            return scale * newton_s1, scale * newton_s2
+        if model_value < 0 && s_norm_sq ≤ tr_radius^2
+            # Newton step is valid descent and within TR
+            return s1, s2
+        elseif model_value < 0 && s_norm_sq > tr_radius^2
+            # Newton step is descent but outside TR - scale to boundary
+            scale = tr_radius / sqrt(s_norm_sq)
+            return scale * s1, scale * s2
         end
     end
     
-    # Fallback: steepest descent to boundary
-    if g_norm_2d > eps(T)
-        scale = tr_radius / g_norm_2d
-        return -scale * g1, -scale * g2
+    # Newton step failed (not descent or H singular) - use Cauchy point
+    # Cauchy point: min_{t≥0, ||ts||≤Δ} m(t*s_sd) where s_sd = -g
+    # m(t*(-g)) = -t||g||^2 + 0.5*t^2*(g'*H*g)
+    # Optimal t = ||g||^2 / (g'Hg) if g'Hg > 0, else t = Δ/||g||
+    
+    gHg = g1*g1*h11 + 2*g1*g2*h12 + g2*g2*h22
+    
+    if gHg > eps(T)
+        # Positive curvature along gradient
+        t_cauchy = g_norm_2d^2 / gHg
+        t = min(t_cauchy, tr_radius / g_norm_2d)
     else
-        return zero(T), zero(T)
+        # Non-positive curvature - go to TR boundary
+        t = tr_radius / g_norm_2d
     end
+    
+    return -t * g1, -t * g2
 end
 
 # ============================================================================

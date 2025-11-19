@@ -110,6 +110,45 @@ end
 # Initialization
 # ============================================================================
 
+"""Helper to compute gradient into DiffResult - generic fallback"""
+function compute_gradient!(f, diff_result::DiffResults.MutableDiffResult, adtype, x)
+    # Try the standard gradient! first
+    try
+        gradient!(f, diff_result, adtype, x)
+    catch e
+        if e isa MethodError && occursin("copyto!", string(e))
+            # Backend doesn't support gradient! into DiffResult (e.g., Zygote)
+            # Use value_and_gradient instead
+            fx, gx = value_and_gradient(f, adtype, x)
+            DiffResults.value!(diff_result, fx)
+            DiffResults.gradient!(diff_result, gx)
+        else
+            rethrow(e)
+        end
+    end
+    return diff_result
+end
+
+"""Specialized version for ForwardDiff - direct call"""
+function compute_gradient!(f, diff_result::DiffResults.MutableDiffResult, ::AutoForwardDiff, x)
+    gradient!(f, diff_result, AutoForwardDiff(), x)
+    return diff_result
+end
+
+"""Specialized version for ReverseDiff - direct call"""
+function compute_gradient!(f, diff_result::DiffResults.MutableDiffResult, ::AutoReverseDiff, x)
+    gradient!(f, diff_result, AutoReverseDiff(), x)
+    return diff_result
+end
+
+"""Specialized version for Zygote - use value_and_gradient"""
+function compute_gradient!(f, diff_result::DiffResults.MutableDiffResult, ::AutoZygote, x)
+    fx, gx = value_and_gradient(f, AutoZygote(), x)
+    DiffResults.value!(diff_result, fx)
+    DiffResults.gradient!(diff_result, gx)
+    return diff_result
+end
+
 function initialize_state(prob::FidesProblem, x0, hessian_update::ExactHessian, options)
     T = eltype(x0)
     n = length(x0)
@@ -135,9 +174,8 @@ function initialize_state(prob::FidesProblem, x0,
     n = length(x0)
     
     # Create GradientResult and compute initial values
-    # DifferentiationInterface signature: gradient!(f, result, backend, x)
     diff_result = DiffResults.GradientResult(x0)
-    gradient!(prob.f, diff_result, prob.adtype, x0)
+    compute_gradient!(prob.f, diff_result, prob.adtype, x0)
     
     # Initialize Hessian approximation as identity
     Hx_approx = Matrix{T}(I, n, n)
@@ -183,7 +221,7 @@ end
 """Evaluate trial point and compute gradient"""
 function evaluate_trial_point!(state::TrustRegionState, f, adtype)
     state.x_trial .= state.x .+ state.step_reflected
-    gradient!(f, state.diff_result_trial, adtype, state.x_trial)
+    compute_gradient!(f, state.diff_result_trial, adtype, state.x_trial)
     state.f_evals += 1
     state.g_evals += 1
 end
@@ -201,10 +239,13 @@ function accept_step!(state::TrustRegionState, hessian_update, f, adtype, option
     state.x .= state.x_trial
     
     if hessian_update isa ExactHessian
-        # For exact Hessian, compute at new point (overwrites diff_result completely)
-        # Then copy gradient from diff_result to have consistent state
-        update_hessian!(state, hessian_update, f, adtype)
-        # No swap - diff_result now has everything at new point
+        # For exact Hessian, compute Hessian at new point (diff_result_trial already has f, g)
+        # then swap buffers
+        hessian!(f, state.diff_result_trial, adtype, state.x)
+        state.h_evals += 1
+        # Swap buffers - diff_result now has f, g, H at new point
+        state.diff_result, state.diff_result_trial = 
+            state.diff_result_trial, state.diff_result
     else
         # For quasi-Newton: update BEFORE swap (needs old and new gradients)
         update_hessian!(state, hessian_update, f, adtype)

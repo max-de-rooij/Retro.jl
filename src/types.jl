@@ -83,7 +83,7 @@ struct TrustRegionOptions{T<:Real}
     verbose::Bool
     
     function TrustRegionOptions{T}(;
-        gtol::T = T(1e-6),
+        gtol::T = T(1e-9),
         xtol::T = T(0.0), 
         ftol::T = T(1e-9),
         initial_tr_radius::T = T(1.0),
@@ -117,7 +117,7 @@ struct TrustRegionResult{T<:Real, VT<:AbstractVector{T}}
     gradient_evaluations::Int # Gradient evaluation count
     hessian_evaluations::Int  # Hessian evaluation count
     converged::Bool          # Convergence flag
-    convergence_reason::Symbol # Reason for termination
+    termination_reason::Symbol # Reason for termination
 end
 
 # ============================================================================
