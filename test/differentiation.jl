@@ -6,7 +6,7 @@ x0 = [1.0, 1.0]
 
 @testset "AutoForwardDiff" begin
     prob = RetroProblem(square, x0, AutoForwardDiff())
-    result = solve(prob, BFGSUpdate(), TwoDimSubspace(), verbose=true)
+    result = solve(prob, BFGSUpdate(), TwoDimSubspace(); verbose=false)
     @test result.converged
     @test isapprox(result.x, [0.0, 0.0]; atol=1e-3)
     @test isapprox(result.fx, 0.0; atol=1e-6)
