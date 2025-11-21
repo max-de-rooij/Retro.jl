@@ -12,19 +12,17 @@ the Gauss-Newton approximation and works well when residuals are small.
 
 
 """
-    compute_gauss_newton_hessian(resfun, adtype, x, params...)
+    compute_gauss_newton_hessian(resfun, adtype, x)
 
 Compute Gauss-Newton Hessian approximation H = J'*J where J is the residual Jacobian.
 
 For a least-squares objective f(x) = 0.5*||r(x)||², the Hessian can be approximated
 as H ≈ J'*J, which ignores second-order terms but is accurate when residuals are small.
-
-Additional arguments (e.g., Constant(p)) are passed through to the residual function.
 """
-function compute_gauss_newton_hessian(resfun, adtype, x, params...)
+function compute_gauss_newton_hessian(resfun, adtype, x)
     # Compute Jacobian of residuals
-    prep_jac = prepare_jacobian(resfun, adtype, x, params...)
-    r, jac = value_and_jacobian(resfun, prep_jac, adtype, x, params...)
+    prep_jac = prepare_jacobian(resfun, adtype, x)
+    r, jac = value_and_jacobian(resfun, prep_jac, adtype, x)
     
     # Form Gauss-Newton approximation: H = J'*J
     H = jac' * jac
@@ -61,11 +59,11 @@ attraction) while benefiting from BFGS's higher convergence rate in later phases
 # Example
 ```julia
 # Gauss-Newton to BFGS hybrid - switches after 5 iterations without radius update
-residuals(x, p) = x .- p.target
-objective(x, p) = 0.5 * sum(abs2, residuals(x, p))
+residuals(x) = x .- [1.0, 2.0]
+objective(x) = 0.5 * sum(abs2, residuals(x))
 prob = RetroProblem(objective, x0, AutoForwardDiff())
 hybrid = HybridUpdate(GaussNewtonUpdate(residuals), BFGSUpdate(), 5)
-result = solve(prob, hybrid, TwoDimSubspace(), p)
+result = solve(prob, hybrid, TwoDimSubspace())
 
 # Exact Hessian to BFGS hybrid
 hybrid = HybridUpdate(ExactHessian(), BFGSUpdate(), 3)

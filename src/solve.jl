@@ -5,14 +5,8 @@ Main solve function implementing the interior-point trust-region reflective
 algorithm of Coleman & Li (1994, 1996).
 """
 
-# ============================================================================
-# Parameter handling
-# ============================================================================
-# All objective functions must have signature f(x, p)
-# Use NullParameters() if parameters are not needed
-
 """
-    solve(prob, hessian_update, subspace, p=NullParameters(); options=RetroOptions(), maxiter=1000, verbose=false)
+    solve(prob::RetroProblem, hessian_update, subspace; kwargs...)
 
 Solve a bound-constrained optimization problem using trust-region methods.
 
@@ -26,10 +20,6 @@ Solve a bound-constrained optimization problem using trust-region methods.
   - `TwoDimSubspace()`: 2D subspace method (good balance, default)
   - `CGSubspace([maxiter])`: Conjugate gradient (good for large problems)
   - `FullSpace()`: Full-dimensional solve (accurate but expensive)
-- `p`: Parameters to pass to objective function (default: `NullParameters()`)
-  - The objective function must have signature `f(x, p)`
-  - Use `f(x, _) = ...` if parameters are not needed
-  - Pass actual parameters as a named tuple, struct, or any type
 
 # Keyword Arguments
 - `maxiter::Int`: Maximum iterations (default: 1000)
@@ -41,18 +31,13 @@ Solve a bound-constrained optimization problem using trust-region methods.
 
 # Examples
 ```julia
-# Without parameters (use _ to ignore parameter argument)
-f(x, _) = sum(abs2, x)
+# Simple unconstrained problem
+f(x) = sum(abs2, x)
 prob = RetroProblem(f, [1.0, 2.0], AutoForwardDiff())
 result = solve(prob, BFGSUpdate(), TwoDimSubspace())
 
-# With parameters
-f(x, p) = sum(abs2, x .- p.target)
-prob = RetroProblem(f, [1.0, 2.0], AutoForwardDiff())
-result = solve(prob, BFGSUpdate(), TwoDimSubspace(), (target=[0.0, 0.0],))
-
 # Rosenbrock with bounds
-f(x, _) = 100(x[2] - x[1]^2)^2 + (1 - x[1])^2
+f(x) = 100(x[2] - x[1]^2)^2 + (1 - x[1])^2
 prob = RetroProblem(f, [-1.2, 1.0], AutoForwardDiff(); lb=[-2.0, -2.0], ub=[2.0, 2.0])
 result = solve(prob, BFGSUpdate(), TwoDimSubspace(); verbose=true)
 ```
@@ -60,8 +45,7 @@ result = solve(prob, BFGSUpdate(), TwoDimSubspace(); verbose=true)
 function solve(
     prob::RetroProblem,
     hessian_update::AbstractHessianUpdate,
-    subspace::AbstractSubspace,
-    p = NullParameters();
+    subspace::AbstractSubspace;
     maxiter::Int = 1000,
     verbose::Bool = false,
     options::RetroOptions = RetroOptions()
@@ -71,9 +55,12 @@ function solve(
 
     # Project initial point to feasible region
     check_and_project_bounds!(prob.x0, prob.lb, prob.ub)
-
+    
+    # Make initial point non-degenerate (move away from bounds if too close)
+    make_non_degenerate!(prob.x0, prob.lb, prob.ub)
+    
     # Initialize optimizer state
-    state = initialize_state(prob, prob.x0, hessian_update, options, p)
+    state = initialize_state(prob, hessian_update, options)
 
     # Identify active constraints and compute free gradient
     update_active_set!(state, options)
@@ -110,12 +97,41 @@ function solve(
 
         # Evaluate trial point (reusing pre-allocated buffers)
         state.x_trial .= state.x .+ state.step_reflected
-        evaluate_trial_point!(state, prob, hessian_update, p)
+        
+        # Try to evaluate trial point, handling evaluation failures
+        # Following fides/ls_trf: reduce trust region if evaluation fails
+        evaluation_failed = false
+        try
+            evaluate_trial_point!(state, prob, hessian_update)
+            # Check for non-finite values (NaN, Inf)
+            if !isfinite(state.fx_trial[]) || !all(isfinite, state.grad_trial)
+                evaluation_failed = true
+            end
+        catch
+            # Evaluation failed (e.g., ODE integration failure)
+            evaluation_failed = true
+        end
+        
+        if evaluation_failed
+            # Reduce trust region radius following fides approach: Δ *= 0.333
+            # (ls_trf uses 0.25, fmincon/lsqnonlin use 0.5)
+            state.tr_radius *= T(0.333)
+            
+            if verbose
+                state.gx_free_norm[] = norm(state.gx_free, Inf)
+                state.step_reflected_norm[] = norm(state.step_reflected)
+                println("iter | ", lpad(iter, 4), " | evaluation failed - reducing radius")
+            end
+            
+            # Skip to next iteration without updating counters
+            continue
+        end
 
         # Compute reduction ratio
         rho = compute_reduction_ratio(state, state.fx_trial[], state.grad_trial, subproblem_step_norm)
 
-        # Update trust-region radius and track if it changed
+        # Update trust-region radius
+        # Note: subproblem_step_norm is already in scaled space from the subproblem solver
         old_radius = state.tr_radius
         update_trust_region_radius!(state, rho, subproblem_step_norm, options)
         radius_updated = (state.tr_radius != old_radius)
@@ -124,13 +140,16 @@ function solve(
         track_radius_update!(hessian_update, radius_updated)
 
         # Decide whether to accept step
-        accepted = rho > options.mu
+        # Following ls_trf: reject if actual reduction is negative (f increased)
+        # This provides additional safety beyond just checking rho > mu
+        actual_reduction = state.value - state.fx_trial[]
+        accepted = (rho > options.mu) && (actual_reduction >= zero(T))
 
         if accepted
             rejected_steps = 0
             
             # Update Hessian before accepting step
-            update_hessian_at_trial!(state, prob, hessian_update, p)
+            update_hessian_at_trial!(state, prob, hessian_update)
             
             # Accept the step
             state.x .= state.x_trial
@@ -138,6 +157,9 @@ function solve(
             state.grad .= state.grad_trial
             state.f_evals += 1
             state.g_evals += 1
+            
+            # Make point non-degenerate after each accepted step (following Fides)
+            make_non_degenerate!(state.x, prob.lb, prob.ub)
 
             # Update active set
             update_active_set!(state, options)
@@ -145,14 +167,18 @@ function solve(
             # Compute function value change for convergence check
             fx_change = abs(state.value - old_fx)
             old_fx = state.value
+            
+            # Cache norms to avoid recomputation
+            state.gx_free_norm[] = norm(state.gx_free, Inf)
+            state.step_reflected_norm[] = norm(state.step_reflected)
 
             if verbose
-                log_step(iter, state.value, norm(state.gx_free, Inf), state.tr_radius, 
-                        norm(state.step_reflected), rho, accepted)
+                log_step(iter, state.value, state.gx_free_norm[], state.tr_radius, 
+                        state.step_reflected_norm[], rho, accepted)
             end
 
-            # Check convergence
-            conv_result = check_convergence(state, iter, options, fx_change, norm(state.step_reflected))
+            # Check convergence (reuse cached norm)
+            conv_result = check_convergence(state, iter, options, fx_change, state.step_reflected_norm[])
             if conv_result !== nothing
                 if verbose
                     println("Optimization terminated: $(conv_result.termination_reason)")
@@ -164,8 +190,11 @@ function solve(
             rejected_steps += 1
             
             if verbose
-                log_step(iter, old_fx, norm(state.gx_free, Inf), state.tr_radius,
-                        norm(state.step_reflected), rho, accepted)
+                # Cache norms to avoid recomputation
+                state.gx_free_norm[] = norm(state.gx_free, Inf)
+                state.step_reflected_norm[] = norm(state.step_reflected)
+                log_step(iter, old_fx, state.gx_free_norm[], state.tr_radius,
+                        state.step_reflected_norm[], rho, accepted)
             end
 
             # Check for stagnation
@@ -227,75 +256,70 @@ function track_radius_update!(hybrid::HybridUpdate, radius_updated::Bool)
 end
 
 """
-    evaluate_trial_point!(state, prob, hessian_update, p)
+    evaluate_trial_point!(state, prob, hessian_update)
 
 Evaluate function and gradient at trial point, respecting prep object type.
 Writes results to state.fx_trial and state.grad_trial.
 """
-function evaluate_trial_point!(state, prob, gn::GaussNewtonUpdate, p)
+function evaluate_trial_point!(state, prob, gn::GaussNewtonUpdate)
     # For Gauss-Newton, recompute from residuals
-    # Use Constant(p) to treat p as constant during differentiation
-    r = gn.resfun(state.x_trial, p)
-    prep_jac = prepare_jacobian(gn.resfun, prob.adtype, state.x_trial, Constant(p))
-    _, jac = value_and_jacobian(gn.resfun, prep_jac, prob.adtype, state.x_trial, Constant(p))
+    r = gn.resfun(state.x_trial)
+    prep_jac = prepare_jacobian(gn.resfun, prob.adtype, state.x_trial)
+    _, jac = value_and_jacobian(gn.resfun, prep_jac, prob.adtype, state.x_trial)
     
     state.fx_trial[] = 0.5 * dot(r, r)
     mul!(state.grad_trial, jac', r)
 end
 
-function evaluate_trial_point!(state, prob, hybrid::HybridUpdate, p)
+function evaluate_trial_point!(state, prob, hybrid::HybridUpdate)
     # Evaluate using the current active strategy
     strategy = current_strategy(hybrid)
     
     # Special handling: if strategy is quasi-Newton but initial was not
     if strategy isa ApproximatingHessianUpdate && !(hybrid.initial isa ApproximatingHessianUpdate)
         # Switched to quasi-Newton from exact/GN - recompute without prep
-        state.fx_trial[], state.grad_trial = value_and_gradient(prob.f, prob.adtype, state.x_trial, Constant(p))
+        state.fx_trial[], state.grad_trial = value_and_gradient(prob.f, prob.adtype, state.x_trial)
         return
     end
     
-    evaluate_trial_point!(state, prob, strategy, p)
+    evaluate_trial_point!(state, prob, strategy)
 end
 
-function evaluate_trial_point!(state, prob, ::ExactHessian, p)
+function evaluate_trial_point!(state, prob, ::ExactHessian)
     # For exact Hessian, prep is for Hessian computation - need separate gradient eval
-    # Use Constant(p) to treat p as constant during differentiation
-    state.fx_trial[], state.grad_trial = value_and_gradient(prob.f, prob.adtype, state.x_trial, Constant(p))
+    state.fx_trial[], state.grad_trial = value_and_gradient(prob.f, prob.adtype, state.x_trial)
 end
 
-function evaluate_trial_point!(state, prob, ::ApproximatingHessianUpdate, p)
-    # For quasi-Newton, use stored prep with Constant(params) for consistency
-    # The prep was created with the same Constant(params), so this is consistent
-    state.fx_trial[], state.grad_trial = value_and_gradient(prob.f, state.prep, prob.adtype, state.x_trial, Constant(state.params))
+function evaluate_trial_point!(state, prob, ::ApproximatingHessianUpdate)
+    # For quasi-Newton, use stored prep for consistency
+    state.fx_trial[], state.grad_trial = value_and_gradient(prob.f, state.prep, prob.adtype, state.x_trial)
 end
 
 """
-    update_hessian_at_trial!(state, prob, hessian_update, p)
+    update_hessian_at_trial!(state, prob, hessian_update)
 
 Update Hessian approximation at the accepted trial point.
 """
-function update_hessian_at_trial!(state, prob, ::ExactHessian, p)
-    # Compute exact Hessian at new point using stored params and prep
-    # The prep was created with Constant(params), so use the same
-    _, _, hess_new = value_gradient_and_hessian(prob.f, state.prep, prob.adtype, state.x_trial, Constant(state.params))
+function update_hessian_at_trial!(state, prob, ::ExactHessian)
+    # Compute exact Hessian at new point using stored prep
+    _, _, hess_new = value_gradient_and_hessian(prob.f, state.prep, prob.adtype, state.x_trial)
     state.hessian .= hess_new
     state.h_evals += 1
 end
 
-function update_hessian_at_trial!(state, prob, gn::GaussNewtonUpdate, p)
-    # Compute Gauss-Newton Hessian at new point
-    # Use Constant(p) to treat p as constant during differentiation
-    _, _, hess_new = compute_gauss_newton_hessian(gn.resfun, prob.adtype, state.x_trial, Constant(p))
-    state.hessian .= hess_new
+function update_hessian_at_trial!(state, prob, gn::GaussNewtonUpdate)
+    # Gauss-Newton: recompute from residuals at new point
+    y, grad, hess = compute_gauss_newton_hessian(gn.resfun, prob.adtype, state.x_trial)
+    state.hessian .= hess
     state.h_evals += 1
 end
 
-function update_hessian_at_trial!(state, prob, update::ApproximatingHessianUpdate, p)
+function update_hessian_at_trial!(state, prob, update::ApproximatingHessianUpdate)
     # Quasi-Newton update
     update_hessian_approx!(state, update)
 end
 
-function update_hessian_at_trial!(state, prob, hybrid::HybridUpdate, p)
+function update_hessian_at_trial!(state, prob, hybrid::HybridUpdate)
     # Use current active strategy
     strategy = current_strategy(hybrid)
     
@@ -304,98 +328,103 @@ function update_hessian_at_trial!(state, prob, hybrid::HybridUpdate, p)
         update_hessian_approx!(state, strategy)
     else
         # Exact or Gauss-Newton: recompute
-        update_hessian_at_trial!(state, prob, strategy, p)
+        update_hessian_at_trial!(state, prob, strategy)
     end
 end
 
 """
-    initialize_state(prob, x0, hessian_update, options)
+    initialize_state(prob, hessian_update, options)
 
-Initialize the optimizer state based on the Hessian approximation strategy.
+Initialize the optimization state.
 """
-function initialize_state(prob::RetroProblem, x0, gn::GaussNewtonUpdate, options, p)
-    T = eltype(x0)
-    n = length(x0)
+function initialize_state(prob::RetroProblem, gn::GaussNewtonUpdate, options::RetroOptions)
+    x0 = copy(prob.x0)
+    tr_radius = options.initial_tr_radius
     
-    # Compute initial Gauss-Newton Hessian
-    # Use Constant(p) to tell AD that p should be treated as constant
-    y, grad, hess = compute_gauss_newton_hessian(gn.resfun, prob.adtype, x0, Constant(p))
+    # Initialize using residual function
+    y, grad, hess = compute_gauss_newton_hessian(gn.resfun, prob.adtype, x0)
     
-    # Note: We don't use prepare_jacobian as prep since it's only for Gauss-Newton
-    # For gradient evals of trial points, we'll recompute from residuals
-    prep = gn  # Store the update object itself as "prep"
+    # For Gauss-Newton, we don't need prep since we recompute from residuals
+    prep = nothing
     
-    state = TrustRegionState(x0, prep, y, grad, hess,
-                            options.initial_tr_radius, prob.lb, prob.ub, p)
-    state.h_evals = 1
-    
-    return state
+    return TrustRegionState(x0, prep, y, grad, hess, tr_radius, prob.lb, prob.ub)
 end
 
-function initialize_state(prob::RetroProblem, x0, hybrid::HybridUpdate, options, p)
+function initialize_state(prob::RetroProblem, hybrid::HybridUpdate, options::RetroOptions)
     # Initialize using the initial strategy
-    # But if fallback is quasi-Newton, also prepare gradient evaluation
-    state = initialize_state(prob, x0, hybrid.initial, options, p)
-    
-    # If the fallback uses quasi-Newton, we need a gradient prep stored somewhere
-    # We'll store it in a special field or recompute when needed
-    # For now, we'll handle this in evaluate_trial_point
-    
-    return state
+    return initialize_state(prob, hybrid.initial, options)
 end
 
-function initialize_state(prob::RetroProblem, x0, ::ExactHessianUpdate, options, p)
-    T = eltype(x0)
+function initialize_state(prob::RetroProblem, ::ExactHessian, options::RetroOptions)
+    x0 = copy(prob.x0)
+    tr_radius = options.initial_tr_radius
+    
+    # Compute initial objective, gradient, and Hessian
+    prep = prepare_hessian(prob.f, prob.adtype, x0)
+    y, grad, hess = value_gradient_and_hessian(prob.f, prep, prob.adtype, x0)
+    
+    return TrustRegionState(x0, prep, y, grad, hess, tr_radius, prob.lb, prob.ub)
+end
+
+function initialize_state(prob::RetroProblem, ::ApproximatingHessianUpdate, options::RetroOptions)
+    x0 = copy(prob.x0)
+    tr_radius = options.initial_tr_radius
+    
+    # For quasi-Newton, compute initial gradient only
+    prep = prepare_gradient(prob.f, prob.adtype, x0)
+    y, grad = value_and_gradient(prob.f, prep, prob.adtype, x0)
+    
+    # Initialize Hessian as identity
     n = length(x0)
+    hess = Matrix{eltype(x0)}(I, n, n)
     
-    # Compute initial value, gradient, and Hessian
-    # Use Constant(p) to tell AD that p should be treated as constant
-    prep = prepare_hessian(prob.f, prob.adtype, x0, Constant(p))
-    y, grad, hess = value_gradient_and_hessian(prob.f, prep, prob.adtype, x0, Constant(p))
-
-    state = TrustRegionState(x0, prep, y, grad, hess,
-                            options.initial_tr_radius, prob.lb, prob.ub, p)
-    state.h_evals = 1
-    
-    return state
+    return TrustRegionState(x0, prep, y, grad, hess, tr_radius, prob.lb, prob.ub)
 end
 
-function initialize_state(prob::RetroProblem, x0, ::ApproximatingHessianUpdate, options, p)
-    T = eltype(x0)
-    n = length(x0)
-    
-    # Compute initial value and gradient
-    # Use Constant(p) to tell AD that p should be treated as constant
-    prep = prepare_gradient(prob.f, prob.adtype, x0, Constant(p))
-    y, grad = value_and_gradient(prob.f, prep, prob.adtype, x0, Constant(p))
-    
-    # Initialize Hessian approximation as identity
-    hess = Matrix{T}(I, n, n)
-    
-    state = TrustRegionState(x0, prep, y, grad, hess,
-                            options.initial_tr_radius, prob.lb, prob.ub, p)
-    
-    return state
-end
 """
     compute_reduction_ratio(state, fx_trial, grad_trial, step_norm)
 
 Compute ratio of actual to predicted reduction.
 
-Following Fides (minimize.py line 564), the actual reduction includes an augmentation term:
-  aug = 0.5 * ss' * diag(dv .* |grad_trial|) * ss
+Following Fides (minimize.py line 564-566), the actual reduction includes an augmentation term
+that accounts for the Coleman-Li barrier function:
+  
+  aug = 0.5 * stepsx' * diag(dv .* |grad_trial|) * stepsx
   actual_reduction = f_old - f_new - aug
 
-This augmentation accounts for the barrier function in Coleman-Li scaling.
+where stepsx is the step in the scaled space. This augmentation is critical for the
+Coleman-Li method as it accounts for the scaling transformation near boundaries.
+
+When predicted_reduction < 0 (model predicts an increase), following Fides and ls_trf,
+we set ρ = 0.0 to prevent inadvertent trust region expansion or step acceptance when
+both actual and predicted reductions are negative.
 """
 function compute_reduction_ratio(state::TrustRegionState{T}, fx_trial::T, grad_trial::AbstractVector{T}, step_norm::T) where T
-    # Actual reduction
-    actual_reduction = state.value - fx_trial
+    # Compute augmentation term using the reflected step in original space
+    # The augmentation is: aug = 0.5 * stepsx' * diag(dv .* |grad_trial|) * stepsx
+    # where stepsx is in scaled space: stepsx_i = step_i / sqrt(|v_i|)
+    # Expanding: aug = 0.5 * sum_i (step_i^2 / |v_i|) * dv_i * |grad_trial_i|
+    #                = 0.5 * sum_i step_i^2 * (dv_i * |grad_trial_i| / |v_i|)
+    aug = zero(T)
+    @inbounds for i in eachindex(state.step_reflected)
+        if abs(state.v[i]) > eps(T)
+            aug += state.step_reflected[i]^2 * state.dv[i] * abs(grad_trial[i]) / abs(state.v[i])
+        end
+    end
+    aug *= T(0.5)
+    
+    # Actual reduction with augmentation
+    actual_reduction = state.value - fx_trial - aug
     
     # Use predicted reduction computed in scaled space by the subproblem solver
-    if state.predicted_reduction > eps(T)
+    # Following Fides/ls_trf: when predicted reduction is negative (model predicts increase),
+    # set rho to 0.0 to prevent trust region expansion and step acceptance
+    if state.predicted_reduction < zero(T)
+        return zero(T)  # Negative predicted reduction -> rho = 0
+    elseif state.predicted_reduction > eps(T)
         return actual_reduction / state.predicted_reduction
     else
+        # Very small positive predicted reduction - avoid division by near-zero
         return -one(T)
     end
 end
@@ -419,6 +448,7 @@ function update_trust_region_radius!(
         state.tr_radius = min(options.gamma2 * state.tr_radius, options.max_tr_radius)
     elseif rho <= options.mu
         # Poor agreement - shrink
+        # Note: evaluation failures are handled separately before this function is called
         state.tr_radius = min(options.gamma1 * state.tr_radius, step_norm / 4)
     end
     # Otherwise keep current radius
@@ -488,7 +518,8 @@ function check_convergence(
     step_norm::T
 ) where T
     
-    gnorm = norm(state.gx_free, Inf)
+    # Use cached norm if available, otherwise compute
+    gnorm = state.gx_free_norm[] > 0 ? state.gx_free_norm[] : norm(state.gx_free, Inf)
     current_fx = state.value
     
     # Gradient convergence (primary criterion)

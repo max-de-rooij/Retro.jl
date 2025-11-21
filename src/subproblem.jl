@@ -28,7 +28,15 @@ function solve_subproblem!(
     
     # Get free variables (not at active bounds)
     g_free = state.gx_free
-    n_free = length(g_free)
+    
+    # Count free variables and populate indices (avoid findall allocation)
+    n_free = 0
+    @inbounds for i in eachindex(state.active_set)
+        if !state.active_set[i]
+            n_free += 1
+            state.free_indices[n_free] = i
+        end
+    end
     
     if n_free == 0
         state.step .= zero(T)
@@ -36,31 +44,41 @@ function solve_subproblem!(
         return
     end
     
+    # Get view into free_indices for the actual free variables
+    free_indices = @view state.free_indices[1:n_free]
+    
     # Apply Coleman-Li scaling transformation
     # Scaled gradient: sg = D*g where D = Diagonal(sqrt(|v|))
-    sg_free = similar(g_free)
-    free_indices = findall(.!state.active_set)
+    # Reuse pre-allocated buffer
+    sg_free = @view state.sg_free[1:n_free]
     
     @inbounds for (i, idx) in enumerate(free_indices)
-        sg_free[i] = sqrt(abs(state.v[idx])) * g_free[i]
+        sg_free[i] = sqrt(abs(state.v[idx])) * state.gx_free[idx]
     end
     
     # Scaled Hessian: SH = D*H*D + diag(g .* dv) where D = Diagonal(sqrt(|v|))
     # For free variables only
-    D_free = Diagonal([sqrt(abs(state.v[idx])) for idx in free_indices])
-    H_free = state.hessian[.!state.active_set, .!state.active_set]
+    # Build D_free diagonal elements without intermediate array allocation
+    D_diag = Vector{T}(undef, n_free)
+    @inbounds for (i, idx) in enumerate(free_indices)
+        D_diag[i] = sqrt(abs(state.v[idx]))
+    end
+    D_free = Diagonal(D_diag)
+    
+    # Extract submatrix for free variables
+    H_free = state.hessian[free_indices, free_indices]
     
     # Compute scaled Hessian: D*H*D
     shess = D_free * H_free * D_free
     
-    # Add diagonal correction: diag(g .* dv)
-    g_dv = [state.grad[idx] * state.dv[idx] for idx in free_indices]
-    @inbounds for i in 1:n_free
-        shess[i, i] += g_dv[i]
+    # Add diagonal correction: diag(g .* dv) - done in-place to avoid allocation
+    @inbounds for (i, idx) in enumerate(free_indices)
+        shess[i, i] += state.grad[idx] * state.dv[idx]
     end
     
     # Dispatch to specific subspace solver (works in scaled space)
-    solve_subproblem_dispatch!(state, subspace, sg_free, shess, D_free, free_indices)
+    # D_diag will be initialized inside the solver-specific dispatch
+    solve_subproblem_dispatch!(state, subspace, sg_free, shess, n_free, free_indices)
 end
 
 # ============================================================================
@@ -72,9 +90,18 @@ function solve_subproblem_dispatch!(
     subspace::TwoDimSubspace,
     sg_free::AbstractVector{T},
     shess::AbstractMatrix{T},
-    D_free::Diagonal{T, Vector{T}},
-    free_indices::Vector{Int}
+    n_free::Int,
+    free_indices::AbstractVector{Int}
 ) where {T, VT, MT}
+    
+    # Initialize workspace buffers
+    initialize_2d_workspace!(subspace, n_free, T)
+    
+    # Compute D_diag using pre-allocated buffer
+    D_diag = subspace.D_diag
+    @inbounds for (i, idx) in enumerate(free_indices)
+        D_diag[i] = sqrt(abs(state.v[idx]))
+    end
     
     gnorm = norm(sg_free)
     tol = sqrt(eps(T))
@@ -85,14 +112,18 @@ function solve_subproblem_dispatch!(
         return
     end
     
-    # First direction: steepest descent (normalized)
-    d1 = -sg_free ./ gnorm
+    # First direction: steepest descent (normalized) - use pre-allocated buffer
+    d1 = subspace.d1
+    inv_gnorm = one(T) / gnorm
+    @. d1 = -sg_free * inv_gnorm
     
-    # Compute shess * sg_free for second direction
-    Hg = shess * sg_free
+    # Compute shess * sg_free for second direction - use pre-allocated buffer
+    Hg = subspace.Hd1  # Reuse Hd1 buffer for Hg temporarily
+    mul!(Hg, shess, sg_free)
     
     # Check if Hessian is positive definite for Newton direction
-    d2 = -Hg
+    d2 = subspace.d2
+    @. d2 = -Hg
     d2_norm = norm(d2)
     
     if d2_norm <= tol
@@ -101,8 +132,9 @@ function solve_subproblem_dispatch!(
         d2_norm = norm(d2)
     end
     
-    # Gram-Schmidt orthogonalization
-    d2 .-= dot(d2, d1) .* d1
+    # Gram-Schmidt orthogonalization - use in-place operations
+    d2_dot_d1 = dot(d2, d1)
+    @. d2 -= d2_dot_d1 * d1
     d2_norm = norm(d2)
     
     if d2_norm <= tol
@@ -121,33 +153,42 @@ function solve_subproblem_dispatch!(
             alpha = state.tr_radius / gnorm
         end
         
-        # Step in scaled space
-        ss = alpha .* d1
+        # Step in scaled space - use pre-allocated buffer
+        ss = subspace.ss
+        @. ss = alpha * d1
         
         # Compute predicted reduction in scaled space: -m(ss) = -(sg'*ss + 0.5*ss'*shess*ss)
-        Hss = shess * ss
+        Hss = subspace.Hss
+        mul!(Hss, shess, ss)
         sg_dot_ss = dot(sg_free, ss)
         ss_H_ss = dot(ss, Hss)
         state.predicted_reduction = -(sg_dot_ss + T(0.5) * ss_H_ss)
         
+        # Store step norm in SCALED space (critical for trust region updates)
+        state.last_step_norm = norm(ss)
+        
         # Transform back to original space
         state.step .= zero(T)
-        state.step[free_indices] .= D_free * ss
+        @inbounds for (i, idx) in enumerate(free_indices)
+            state.step[idx] = D_diag[i] * ss[i]
+        end
         state.step[state.active_set] .= zero(T)
-        state.last_step_norm = norm(state.step)
         return
     end
     
     # Normalize d2
-    d2 ./= d2_norm
+    inv_d2_norm = one(T) / d2_norm
+    @. d2 *= inv_d2_norm
     
     # Project gradient and Hessian onto 2D subspace
     g1 = dot(sg_free, d1)
     g2 = dot(sg_free, d2)
     
-    # Compute Hessian in 2D subspace
-    Hd1 = shess * d1
-    Hd2 = shess * d2
+    # Compute Hessian in 2D subspace - use pre-allocated buffers
+    Hd1 = subspace.Hd1
+    Hd2 = subspace.Hd2
+    mul!(Hd1, shess, d1)
+    mul!(Hd2, shess, d2)
     
     h11 = dot(d1, Hd1)
     h22 = dot(d2, Hd2)
@@ -156,20 +197,26 @@ function solve_subproblem_dispatch!(
     # Solve 2D trust region subproblem
     alpha, beta = solve_2d_subproblem(subspace.solver, g1, g2, h11, h22, h12, state.tr_radius)
     
-    # Reconstruct step in scaled space
-    ss = alpha .* d1 .+ beta .* d2
+    # Reconstruct step in scaled space - use pre-allocated buffer
+    ss = subspace.ss
+    @. ss = alpha * d1 + beta * d2
     
     # Compute predicted reduction in scaled space: -m(ss) = -(sg'*ss + 0.5*ss'*shess*ss)
-    Hss = shess * ss
+    Hss = subspace.Hss
+    mul!(Hss, shess, ss)
     sg_dot_ss = dot(sg_free, ss)
     ss_H_ss = dot(ss, Hss)
     state.predicted_reduction = -(sg_dot_ss + T(0.5) * ss_H_ss)
     
+    # Store step norm in SCALED space (critical for trust region updates)
+    state.last_step_norm = norm(ss)
+    
     # Transform back to original space: s = D * ss
     state.step .= zero(T)
-    state.step[free_indices] .= D_free * ss
+    @inbounds for (i, idx) in enumerate(free_indices)
+        state.step[idx] = D_diag[i] * ss[i]
+    end
     state.step[state.active_set] .= zero(T)
-    state.last_step_norm = norm(state.step)
 end
 
 """
@@ -241,7 +288,7 @@ function solve_2d_subproblem(
     end
     
     # Need boundary solution via secular equation
-    # Try Newton's method first
+    # Try Newton Raphson method first
     f(λ) = secular_2d(λ, g1, g2, h11, h22, h12, tr_radius)
     df(λ) = dsecular_2d(λ, g1, g2, h11, h22, h12, tr_radius)
     
@@ -429,9 +476,18 @@ function solve_subproblem_dispatch!(
     subspace::FullSpace,
     sg_free::AbstractVector{T},
     shess::AbstractMatrix{T},
-    D_free::Diagonal{T, Vector{T}},
-    free_indices::Vector{Int}
+    n_free::Int,
+    free_indices::AbstractVector{Int}
 ) where {T, VT, MT}
+    
+    # Initialize workspace buffers
+    initialize_fullspace_workspace!(subspace, n_free, T)
+    
+    # Compute D_diag using pre-allocated buffer
+    D_diag = subspace.D_diag
+    @inbounds for (i, idx) in enumerate(free_indices)
+        D_diag[i] = sqrt(abs(state.v[idx]))
+    end
     
     gnorm = norm(sg_free)
     if gnorm <= sqrt(eps(T))
@@ -440,18 +496,22 @@ function solve_subproblem_dispatch!(
         return
     end
     
-    # Solve in scaled space
-    ss, step_type = solve_nd_subproblem(subspace.solver, shess, sg_free, state.tr_radius)
+    # Solve in scaled space - pass workspace buffers
+    ss, step_type = solve_nd_subproblem(subspace.solver, subspace, shess, sg_free, state.tr_radius)
     
     # Compute predicted reduction in scaled space: -m(ss) = -(sg'*ss + 0.5*ss'*shess*ss)
     Hss = shess * ss
     state.predicted_reduction = -(dot(sg_free, ss) + T(0.5) * dot(ss, Hss))
     
+    # Store step norm in SCALED space (critical for trust region updates)
+    state.last_step_norm = norm(ss)
+    
     # Transform back to original space: s = D * ss
     state.step .= zero(T)
-    state.step[free_indices] .= D_free * ss
+    @inbounds for (i, idx) in enumerate(free_indices)
+        state.step[idx] = D_diag[i] * ss[i]
+    end
     state.step[state.active_set] .= zero(T)
-    state.last_step_norm = norm(state.step)
 end
 
 """
@@ -464,13 +524,15 @@ Returns (s, step_type) where step_type indicates the solution type.
 """
 function solve_nd_subproblem(
     solver::EigenvalueSolver,
+    fullspace::FullSpace,
     B::AbstractMatrix{T},
     g::AbstractVector{T},
     delta::T
 ) where T<:Real
     
     if delta == 0
-        return zeros(T, length(g)), "zero"
+        fill!(fullspace.s_buffer, zero(T))
+        return fullspace.s_buffer, "zero"
     end
     
     # Eigenvalue decomposition
@@ -484,7 +546,7 @@ function solve_nd_subproblem(
     
     # POSITIVE DEFINITE CASE
     if mineig > zero(T)
-        s = slam_nd(zero(T), w, eigvals, eigvecs)
+        s = slam_nd!(fullspace.c_buffer, fullspace.el_buffer, fullspace.s_buffer, zero(T), w, eigvals, eigvecs)
         if norm(s) <= delta + sqrt(eps(T))
             return s, "posdef"
         end
@@ -494,8 +556,8 @@ function solve_nd_subproblem(
     end
     
     # INDEFINITE CASE - need to solve secular equation
-    f(λ) = secular_nd(λ, w, eigvals, eigvecs, delta)
-    df(λ) = dsecular_nd(λ, w, eigvals, eigvecs, delta)
+    f(λ) = secular_nd(fullspace.c_buffer, fullspace.el_buffer, fullspace.s_buffer, λ, w, eigvals, eigvecs, delta)
+    df(λ) = dsecular_nd(fullspace.c_buffer, fullspace.el_buffer, fullspace.s_buffer, λ, w, eigvals, eigvecs, delta)
     
     if f(λ_init) < -solver.newton_tolerance
         # Try Newton's method
@@ -538,7 +600,7 @@ function solve_nd_subproblem(
             end
         end
         
-        s = slam_nd(λ_sol, w, eigvals, eigvecs)
+        s = slam_nd!(fullspace.c_buffer, fullspace.el_buffer, fullspace.s_buffer, λ_sol, w, eigvals, eigvecs)
         if norm(s) <= delta + sqrt(eps(T))
             return s, "indef"
         end
@@ -547,7 +609,7 @@ function solve_nd_subproblem(
     # HARD CASE
     w_hard = copy(w)
     w_hard[abs.(eigvals .- mineig) .< sqrt(eps(T))] .= zero(T)
-    s = slam_nd(-mineig, w_hard, eigvals, eigvecs)
+    s = slam_nd!(fullspace.c_buffer, fullspace.el_buffer, fullspace.s_buffer, -mineig, w_hard, eigvals, eigvecs)
     
     # Compute sigma to reach boundary
     sigma = sqrt(max(delta^2 - norm(s)^2, zero(T)))
@@ -560,38 +622,60 @@ end
 # Helper functions for N-D subproblem
 # ============================================================================
 
-function slam_nd(
+function slam_nd!(
+    c_buffer::AbstractVector{T},
+    el_buffer::AbstractVector{T},
+    s_buffer::AbstractVector{T},
     λ::T,
     w::AbstractVector{T},
     eigvals::AbstractVector{T},
     eigvecs::AbstractMatrix{T}
 ) where T<:Real
-    c = copy(w)
-    el = eigvals .+ λ
-    mask = abs.(el) .> eps(T)
-    c[mask] ./= el[mask]
-    return eigvecs * c
+    # Use pre-allocated buffers
+    c = c_buffer
+    @. c = w
+    el = el_buffer
+    @. el = eigvals + λ
+    @inbounds for i in eachindex(c)
+        if abs(el[i]) > eps(T)
+            c[i] /= el[i]
+        end
+    end
+    mul!(s_buffer, eigvecs, c)
+    return s_buffer
 end
 
-function dslam_nd(
+function dslam_nd!(
+    c_buffer::AbstractVector{T},
+    el_buffer::AbstractVector{T},
+    s_buffer::AbstractVector{T},
     λ::T,
     w::AbstractVector{T},
     eigvals::AbstractVector{T},
     eigvecs::AbstractMatrix{T}
 ) where T<:Real
-    c = copy(w)
-    el = eigvals .+ λ
+    # Use pre-allocated buffers
+    c = c_buffer
+    @. c = w
+    el = el_buffer
+    @. el = eigvals + λ
     
-    mask_nonzero = abs.(el) .> eps(T)
-    c[mask_nonzero] ./= -(el[mask_nonzero].^2)
+    @inbounds for i in eachindex(c)
+        if abs(el[i]) > eps(T)
+            c[i] /= -(el[i]^2)
+        elseif abs(c[i]) > eps(T)
+            c[i] = T(Inf)
+        end
+    end
     
-    mask_singular = (.!mask_nonzero) .& (abs.(c) .> eps(T))
-    c[mask_singular] .= T(Inf)
-    
-    return eigvecs * c
+    mul!(s_buffer, eigvecs, c)
+    return s_buffer
 end
 
 function secular_nd(
+    c_buffer::AbstractVector{T},
+    el_buffer::AbstractVector{T},
+    s_buffer::AbstractVector{T},
     λ::T,
     w::AbstractVector{T},
     eigvals::AbstractVector{T},
@@ -602,7 +686,7 @@ function secular_nd(
         return T(Inf)
     end
     
-    s = slam_nd(λ, w, eigvals, eigvecs)
+    s = slam_nd!(c_buffer, el_buffer, s_buffer, λ, w, eigvals, eigvecs)
     sn = norm(s)
     
     if sn > zero(T)
@@ -613,14 +697,20 @@ function secular_nd(
 end
 
 function dsecular_nd(
+    c_buffer::AbstractVector{T},
+    el_buffer::AbstractVector{T},
+    s_buffer::AbstractVector{T},
     λ::T,
     w::AbstractVector{T},
     eigvals::AbstractVector{T},
     eigvecs::AbstractMatrix{T},
     delta::T
 ) where T<:Real
-    s = slam_nd(λ, w, eigvals, eigvecs)
-    ds = dslam_nd(λ, w, eigvals, eigvecs)
+    # Need two s_buffers - create temporary for ds
+    s = slam_nd!(c_buffer, el_buffer, s_buffer, λ, w, eigvals, eigvecs)
+    # Reuse c_buffer for ds computation (different from c in slam)
+    ds_temp = Vector{T}(undef, length(w))  # TODO: Could add another buffer to avoid this
+    ds = dslam_nd!(c_buffer, el_buffer, ds_temp, λ, w, eigvals, eigvecs)
     sn = norm(s)
     
     if sn > zero(T)
@@ -639,9 +729,15 @@ function solve_subproblem_dispatch!(
     subspace::CGSubspace,
     sg_free::AbstractVector{T},
     shess::AbstractMatrix{T},
-    D_free::Diagonal{T, Vector{T}},
-    free_indices::Vector{Int}
+    n_free::Int,
+    free_indices::AbstractVector{Int}
 ) where {T, VT, MT}
+    
+    # Compute D_diag (CG doesn't need it stored, compute inline)
+    D_diag = Vector{T}(undef, n_free)
+    @inbounds for (i, idx) in enumerate(free_indices)
+        D_diag[i] = sqrt(abs(state.v[idx]))
+    end
     
     gnorm = norm(sg_free)
     if gnorm <= sqrt(eps(T))
@@ -652,14 +748,16 @@ function solve_subproblem_dispatch!(
     end
     
     # Compute predicted reduction (need to implement in steihaug_toint!)
-    ss = steihaug_toint!(state, sg_free, shess, state.tr_radius, subspace.maxiter)
+    ss = steihaug_toint!(state, subspace, sg_free, shess, state.tr_radius, subspace.maxiter)
+    
+    # Store step norm in SCALED space (critical for trust region updates)
+    state.last_step_norm = norm(ss)
     
     # Transform back to original space: s = D * ss
     state.step .= zero(T)
     @inbounds for (i, idx) in enumerate(free_indices)
-        state.step[idx] = D_free.diag[i] * ss[i]
+        state.step[idx] = D_diag[i] * ss[i]
     end
-    state.last_step_norm = norm(state.step)
 end
 
 """
@@ -678,6 +776,7 @@ Hessian is expensive.
 """
 function steihaug_toint!(
     state::TrustRegionState{T, VT, MT},
+    cg_subspace::CGSubspace,
     g::AbstractVector{T},
     H::AbstractMatrix{T},
     delta::T,
@@ -685,9 +784,18 @@ function steihaug_toint!(
 ) where {T<:Real, VT, MT}
     
     n = length(g)
-    z = zeros(T, n)
-    r = copy(g)
-    d = -copy(g)
+    
+    # Initialize workspace buffers if needed
+    initialize_cg_workspace!(cg_subspace, n, T)
+    
+    # Use pre-allocated buffers from CGSubspace
+    z = cg_subspace.z
+    r = cg_subspace.r
+    d = cg_subspace.d
+    
+    fill!(z, zero(T))
+    @. r = g
+    @. d = -g
     
     gnorm_sq = dot(g, g)
     eps_cg = min(T(0.5), sqrt(gnorm_sq)) * gnorm_sq
@@ -698,29 +806,36 @@ function steihaug_toint!(
     end
     
     for iter in 1:min(maxiter, n)
-        Hd = H * d
+        # Use pre-allocated buffer for H*d
+        Hd = cg_subspace.Hd
+        mul!(Hd, H, d)
         dHd = dot(d, Hd)
         
         # Negative curvature - go to boundary along d
         if dHd <= eps(T)
             tau = solve_quadratic_tr(z, d, delta)
-            ss = z .+ tau .* d
+            ss = cg_subspace.ss
+            @. ss = z + tau * d
             # Compute predicted reduction: -m(ss) = -(g'*ss + 0.5*ss'*H*ss)
-            Hss = H * ss
+            Hss = cg_subspace.Hss
+            mul!(Hss, H, ss)
             state.predicted_reduction = -(dot(g, ss) + T(0.5) * dot(ss, Hss))
             return ss
         end
         
         # Standard CG step
         alpha = dot(r, r) / dHd
-        z_new = z .+ alpha .* d
+        z_new = cg_subspace.z_new
+        @. z_new = z + alpha * d
         
         # Check if step would leave trust region
         if norm(z_new) >= delta
             tau = solve_quadratic_tr(z, d, delta)
-            ss = z .+ tau .* d
+            ss = cg_subspace.ss
+            @. ss = z + tau * d
             # Compute predicted reduction: -m(ss) = -(g'*ss + 0.5*ss'*H*ss)
-            Hss = H * ss
+            Hss = cg_subspace.Hss
+            mul!(Hss, H, ss)
             state.predicted_reduction = -(dot(g, ss) + T(0.5) * dot(ss, Hss))
             return ss
         end
@@ -733,7 +848,8 @@ function steihaug_toint!(
         # Check convergence
         if r_norm_sq < eps_cg
             # Compute predicted reduction: -m(ss) = -(g'*z_new + 0.5*z_new'*H*z_new)
-            Hz = H * z_new
+            Hz = cg_subspace.Hz
+            mul!(Hz, H, z_new)
             state.predicted_reduction = -(dot(g, z_new) + T(0.5) * dot(z_new, Hz))
             return z_new
         end
@@ -744,7 +860,8 @@ function steihaug_toint!(
     end
     
     # Maxiter reached - compute predicted reduction for final z
-    Hz = H * z
+    Hz = cg_subspace.Hz
+    mul!(Hz, H, z)
     state.predicted_reduction = -(dot(g, z) + T(0.5) * dot(z, Hz))
     return z
 end

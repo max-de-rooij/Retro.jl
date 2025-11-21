@@ -1,7 +1,4 @@
-using Retro, Test, BenchmarkTools, ForwardDiff
-#import Fides
-
-#include("fides.jl")
+using Retro, Test, ForwardDiff, BenchmarkTools
 
 @testset "Boilerplate Tests" begin
     include("boilerplate.jl")

@@ -1,5 +1,5 @@
 # Rosenbrock function with bounds
-rosenbrock(x,_) = 100*(x[2] - x[1]^2)^2 + (1 - x[1])^2
+rosenbrock(x) = 100*(x[2] - x[1]^2)^2 + (1 - x[1])^2
 
 prob = RetroProblem(rosenbrock, [-1.2, 1.5], AutoForwardDiff(); 
                    lb=[-2.0, -2.0], ub=[2.0, 2.0])
@@ -10,10 +10,6 @@ prob = RetroProblem(rosenbrock, [-1.2, 1.5], AutoForwardDiff();
     @test result_2dim.converged
     @test isapprox(result_2dim.x, [1.0, 1.0]; atol=1e-4)
     @test isapprox(result_2dim.fx, 0.0; atol=1e-6)
-
-    # benchmark this one
-    bres = @benchmark solve($prob, $BFGSUpdate(), $TwoDimSubspace(); maxiter=10000, verbose=false)
-    display(bres)
 
     result_cg = solve(prob, BFGSUpdate(), CGSubspace(); maxiter=10000, verbose=false)
     @test result_cg.converged

@@ -7,16 +7,6 @@ abstract type AbstractHessianUpdate end
 abstract type ExactHessianUpdate <: AbstractHessianUpdate end
 abstract type ApproximatingHessianUpdate <: AbstractHessianUpdate end
 
-"""
-    NullParameters
-
-Singleton type indicating that the objective function does not use parameters.
-When `NullParameters()` is passed to `solve`, the objective function `f(x, p)`
-is called as `f(x, NullParameters())`, allowing the function to ignore the
-parameter argument.
-"""
-struct NullParameters end
-
 abstract type AbstractSubspace end
 abstract type AbstractSubproblemSolver end
 
@@ -65,18 +55,18 @@ This is particularly effective when residuals are small near the solution.
 Requires the user to provide a function that returns residual vector.
 
 # Fields
-- `resfun`: Function that computes residuals: `r = resfun(x, p)`
+- `resfun`: Function that computes residuals: `r = resfun(x)`
 
 # Example
 ```julia
 # Residual function
-residuals(x, p) = x .- p.target
+residuals(x) = x .- [1.0, 2.0]
 # Objective function (for other methods)
-objective(x, p) = 0.5 * sum(abs2, residuals(x, p))
+objective(x) = 0.5 * sum(abs2, residuals(x))
 # Create problem with objective
 prob = RetroProblem(objective, x0, AutoForwardDiff())
 # Use Gauss-Newton with residual function
-result = solve(prob, GaussNewtonUpdate(residuals), TwoDimSubspace(), p)
+result = solve(prob, GaussNewtonUpdate(residuals), TwoDimSubspace())
 ```
 """
 struct GaussNewtonUpdate{F} <: ExactHessianUpdate
@@ -113,7 +103,7 @@ The hard case is treated separately.
 struct EigenvalueSolver <: AbstractSubproblemSolver 
     max_newton_iterations::Int
     newton_tolerance::Float64
-    function EigenvalueSolver(; max_newton_iterations::Int=50, newton_tolerance::Float64=1e-12)
+    function EigenvalueSolver(; max_newton_iterations::Int=100, newton_tolerance::Float64=1e-12)
         new(max_newton_iterations, newton_tolerance)
     end
 end
@@ -151,11 +141,42 @@ speed and quality for most problems.
 - `solver::AbstractSubproblemSolver`: Solver to use for the 2D subproblem
   - `EigenvalueSolver()`: Exact solution (default, most accurate)
   - `CauchyPointSolver()`: Fast approximate solution (faster but less accurate)
+
+# Workspace Buffers
+The struct contains pre-allocated workspace buffers to avoid allocations during
+subproblem solving. These are initialized lazily on first use.
 """
-struct TwoDimSubspace <: AbstractSubspace 
+mutable struct TwoDimSubspace{T<:Real, VT<:AbstractVector{T}} <: AbstractSubspace 
     solver::AbstractSubproblemSolver
+    # Workspace buffers (initialized lazily)
+    d1::Union{Nothing, VT}  # First 2D basis direction
+    d2::Union{Nothing, VT}  # Second 2D basis direction
+    ss::Union{Nothing, VT}  # Solution step in scaled space
+    Hd1::Union{Nothing, VT}  # H*d1 buffer
+    Hd2::Union{Nothing, VT}  # H*d2 buffer
+    Hss::Union{Nothing, VT}  # H*ss buffer
+    D_diag::Union{Nothing, VT}  # Diagonal scaling vector
+    
     function TwoDimSubspace(; solver::AbstractSubproblemSolver=EigenvalueSolver())
-        new(solver)
+        new{Float64, Vector{Float64}}(solver, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
+    end
+end
+
+"""
+    initialize_2d_workspace!(td::TwoDimSubspace, n::Int, ::Type{T})
+
+Initialize workspace buffers for 2D subspace solver if not already initialized.
+"""
+function initialize_2d_workspace!(td::TwoDimSubspace{T2, VT}, n::Int, ::Type{T}) where {T2, VT, T}
+    # If buffers don't exist or wrong size, create them
+    if isnothing(td.d1) || length(td.d1) != n
+        td.d1 = Vector{T}(undef, n)
+        td.d2 = Vector{T}(undef, n)
+        td.ss = Vector{T}(undef, n)
+        td.Hd1 = Vector{T}(undef, n)
+        td.Hd2 = Vector{T}(undef, n)
+        td.Hss = Vector{T}(undef, n)
+        td.D_diag = Vector{T}(undef, n)
     end
 end
 
@@ -169,15 +190,40 @@ Most accurate but expensive for large problems. Always uses EigenvalueSolver.
 
 # Fields
 - `solver::AbstractSubproblemSolver`: Always EigenvalueSolver for full space problems
+
+# Workspace Buffers
+The struct contains pre-allocated workspace buffers to avoid allocations during
+subproblem solving. These are initialized lazily on first use.
 """
-struct FullSpace <: AbstractSubspace 
+mutable struct FullSpace{T<:Real, VT<:AbstractVector{T}} <: AbstractSubspace 
     solver::AbstractSubproblemSolver
+    # Workspace buffers (initialized lazily)
+    D_diag::Union{Nothing, VT}  # Diagonal scaling vector
+    c_buffer::Union{Nothing, VT}  # Buffer for slam_nd/dslam_nd computations
+    el_buffer::Union{Nothing, VT}  # Buffer for eigvals + lambda
+    s_buffer::Union{Nothing, VT}  # Buffer for solution vector
+    
     function FullSpace(; solver::AbstractSubproblemSolver=EigenvalueSolver())
         if !(solver isa EigenvalueSolver)
             @warn "FullSpace only supports EigenvalueSolver. Using EigenvalueSolver()."
-            return new(EigenvalueSolver())
+            return new{Float64, Vector{Float64}}(EigenvalueSolver(), nothing, nothing, nothing, nothing)
         end
-        new(solver)
+        new{Float64, Vector{Float64}}(solver, nothing, nothing, nothing, nothing)
+    end
+end
+
+"""
+    initialize_fullspace_workspace!(fs::FullSpace, n::Int, ::Type{T})
+
+Initialize workspace buffers for full space solver if not already initialized.
+"""
+function initialize_fullspace_workspace!(fs::FullSpace{T2, VT}, n::Int, ::Type{T}) where {T2, VT, T}
+    # If buffers don't exist or wrong size, create them
+    if isnothing(fs.D_diag) || length(fs.D_diag) != n
+        fs.D_diag = Vector{T}(undef, n)
+        fs.c_buffer = Vector{T}(undef, n)
+        fs.el_buffer = Vector{T}(undef, n)
+        fs.s_buffer = Vector{T}(undef, n)
     end
 end
 
@@ -191,10 +237,43 @@ problems where forming the full Hessian or 2D subspace is expensive.
 
 # Arguments
 - `maxiter::Int`: Maximum CG iterations (default: 200)
+
+# Workspace Buffers
+The struct contains pre-allocated workspace buffers to avoid allocations during
+CG iterations. These are initialized lazily on first use.
 """
-struct CGSubspace <: AbstractSubspace
+mutable struct CGSubspace{T<:Real, VT<:AbstractVector{T}} <: AbstractSubspace
     maxiter::Int
-    CGSubspace(maxiter::Int=200) = new(maxiter)
+    # Workspace buffers (initialized lazily)
+    z::Union{Nothing, VT}  # CG solution vector
+    r::Union{Nothing, VT}  # CG residual
+    d::Union{Nothing, VT}  # CG search direction
+    Hd::Union{Nothing, VT}  # H*d buffer
+    z_new::Union{Nothing, VT}  # New z for boundary check
+    ss::Union{Nothing, VT}  # Step at trust region boundary
+    Hss::Union{Nothing, VT}  # H*ss buffer
+    Hz::Union{Nothing, VT}  # H*z buffer
+    
+    CGSubspace(maxiter::Int=200) = new{Float64, Vector{Float64}}(maxiter, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
+end
+
+"""
+    initialize_cg_workspace!(cg::CGSubspace, n::Int, ::Type{T})
+
+Initialize workspace buffers for CG solver if not already initialized.
+"""
+function initialize_cg_workspace!(cg::CGSubspace{T, VT}, n::Int, ::Type{T2}) where {T, VT, T2}
+    # If buffers don't exist or wrong size, create them
+    if isnothing(cg.z) || length(cg.z) != n
+        cg.z = zeros(T2, n)
+        cg.r = Vector{T2}(undef, n)
+        cg.d = Vector{T2}(undef, n)
+        cg.Hd = Vector{T2}(undef, n)
+        cg.z_new = Vector{T2}(undef, n)
+        cg.ss = Vector{T2}(undef, n)
+        cg.Hss = Vector{T2}(undef, n)
+        cg.Hz = Vector{T2}(undef, n)
+    end
 end
 
 
@@ -209,7 +288,7 @@ Encapsulates an objective function, initial point, automatic differentiation bac
 and optional bound constraints.
 
 # Fields
-- `f::F`: Objective function to minimize, in the form `f(x, p)` where `x` is the variable to be optimized and `p` are any fixed parameters.
+- `f::F`: Objective function to minimize, in the form `f(x)` where `x` is the variable to be optimized.
 - `x0::X`: Initial guess for optimization variables
 - `adtype::ADT`: Automatic differentiation backend (e.g., `AutoForwardDiff()`)
 - `lb::X`: Lower bounds (-Inf or vector matching `x0`)
@@ -399,12 +478,30 @@ mutable struct TrustRegionState{T<:Real, VT<:AbstractVector{T}, MT<:AbstractMatr
     Δg::VT
     last_step_norm::T
     predicted_reduction::T  # Model reduction from subproblem
-    params::Any  # Parameters for objective function
     
     # Trial point buffers (to reduce allocations)
     x_trial::VT
     fx_trial::Base.RefValue{T}
     grad_trial::VT
+    
+    # Subproblem workspace buffers
+    sg_free::VT  # Scaled gradient for free variables
+    free_indices::Vector{Int}  # Indices of free variables
+    gx_free_norm::Base.RefValue{T}  # Cached norm
+    step_reflected_norm::Base.RefValue{T}  # Cached norm
+    
+    # Reflective bounds workspace buffers (to avoid allocations in apply_reflective_bounds!)
+    x_current::VT  # Current position along reflection path
+    p_current::VT  # Current step direction during reflection
+    p_remaining::VT  # Remaining step after hitting boundary
+    p_reflected::VT  # Reflected step direction
+    s_direct::VT  # Direct step for model comparison
+    s_reflect::VT  # Reflected step for model comparison
+    x_boundary::VT  # Position at boundary
+    step_cauchy::VT  # Constrained Cauchy point
+    step_truncated::VT  # Truncated step at boundary
+    cauchy_d::VT  # Direction for Cauchy point computation
+    Hd_buffer::VT  # Buffer for H*d computations
 end
 
 function TrustRegionState(
@@ -415,8 +512,7 @@ function TrustRegionState(
     hessian::MT,
     tr_radius::T,
     lb::VT,
-    ub::VT,
-    params = NullParameters()
+    ub::VT
 ) where {T<:Real, VT<:AbstractVector{T}, MT<:AbstractMatrix{T}}
     n = length(x0)
     
@@ -438,6 +534,25 @@ function TrustRegionState(
     fx_trial = Ref(zero(T))
     grad_trial = similar(x0)
     
+    # Subproblem workspace buffers
+    sg_free = similar(x0)
+    free_indices = Vector{Int}(undef, n)
+    gx_free_norm = Ref(zero(T))
+    step_reflected_norm = Ref(zero(T))
+    
+    # Reflective bounds workspace buffers
+    x_current = similar(x0)
+    p_current = similar(x0)
+    p_remaining = similar(x0)
+    p_reflected = similar(x0)
+    s_direct = similar(x0)
+    s_reflect = similar(x0)
+    x_boundary = similar(x0)
+    step_cauchy = similar(x0)
+    step_truncated = similar(x0)
+    cauchy_d = similar(x0)
+    Hd_buffer = similar(x0)
+    
     TrustRegionState{T, VT, MT}(
         copy(x0),
         prep,
@@ -450,7 +565,10 @@ function TrustRegionState(
         0, 1, 1, 0,  # Counters
         step, step_reflected, Hg,
         Hs, Δg, zero(T), zero(T),  # last_step_norm, predicted_reduction
-        params,  # Parameters
-        x_trial, fx_trial, grad_trial  # Trial point buffers
+        x_trial, fx_trial, grad_trial,  # Trial point buffers
+        sg_free, free_indices, gx_free_norm, step_reflected_norm,  # Subproblem buffers
+        x_current, p_current, p_remaining, p_reflected,  # Reflection buffers
+        s_direct, s_reflect, x_boundary, step_cauchy, step_truncated,  # More reflection buffers
+        cauchy_d, Hd_buffer  # Cauchy point buffers
     )
 end

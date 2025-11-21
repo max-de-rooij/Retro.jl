@@ -1,7 +1,7 @@
 import ReverseDiff, Zygote
 
 # define simple quadratic function
-square(x,_) = sum(x.^2)
+square(x) = sum(x.^2)
 x0 = [1.0, 1.0]
 
 @testset "AutoForwardDiff" begin
