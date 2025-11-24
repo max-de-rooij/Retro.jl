@@ -5,84 +5,158 @@ Implementations of various Hessian approximation update methods for
 quasi-Newton optimization.
 """
 
-
 """
-    update_hessian!(state, ::BFGSUpdate, f, adtype)
+    update_hessian_approx!(state, update_type)
 
-Update Hessian approximation using the BFGS formula.
-
-BFGS (Broyden-Fletcher-Goldfarb-Shanno) is a rank-2 update that maintains
-positive-definiteness and symmetry. It's the most robust quasi-Newton method
-for most optimization problems.
-
-The update satisfies the secant equation: H_new * s = y
-where s is the step and y is the gradient difference.
+Update quasi-Newton Hessian approximation.
 """
-function update_hessian!(state::TrustRegionState, ::BFGSUpdate, f, adtype)
+function update_hessian_approx!(::TrustRegionState, ::ExactHessianUpdate)
+    # No-op: Hessian is computed exactly at each iteration
+    nothing
+end
+
+function update_hessian_approx!(state::TrustRegionState, ::BFGSUpdate)
+    # Use the actual taken step (reflected), not the subproblem step
+    # This is the step from old x to new x
     s = state.step_reflected
-
-    # Compute gradient difference
     y = state.Δg
-    y .= gx_trial(state) .- gx(state)
+    @. y = state.grad_trial - state.grad
+    
     sy = dot(s, y)
     T = eltype(s)
     
     if sy > eps(T) * norm(s) * norm(y)
-        H = state.Hx_approx
+        H = state.hessian
         mul!(state.Hs, H, s)
         sHs = dot(s, state.Hs)
         
         if sHs > eps(T)
-            # In-place BFGS update: H_new = H - (Hs)(Hs)'/sHs + yy'/sy
+            # BFGS update: H_new = H - (Hs)(Hs)'/sHs + yy'/sy
             H .-= (state.Hs * state.Hs') ./ sHs
             H .+= (y * y') ./ sy
         end
     end
 end
 
-"""
-    update_hessian!(state, ::SR1Update, f, adtype)
-
-Update Hessian approximation using the SR1 (Symmetric Rank-1) formula.
-
-SR1 can better capture indefinite Hessians than BFGS but may lose
-positive-definiteness. The update is skipped if it would be too small
-or degenerate.
-
-The update satisfies: H_new * s = y
-"""
-function update_hessian!(state::TrustRegionState, ::SR1Update, f, adtype)
+function update_hessian_approx!(state::TrustRegionState, ::SR1Update)
+    # Use the actual taken step (reflected), not the subproblem step
     s = state.step_reflected
-    
-    # Compute gradient difference
     y = state.Δg
-    y .= gx_trial(state) .- gx(state)
+    @. y = state.grad_trial - state.grad
     
-    H = state.Hx_approx
+    H = state.hessian
     mul!(state.Hs, H, s)
-    
-    # Compute r = y - Hs
-    r = state.Δg
-    @. r = y - state.Hs
-    
+    r = y .- state.Hs
     rs = dot(r, s)
     T = eltype(s)
     
     if abs(rs) > eps(T) * norm(r) * norm(s)
-        # In-place SR1 update: H_new = H + rr'/rs
+        # SR1 update: H_new = H + rr'/rs
         H .+= (r * r') ./ rs
     end
 end
 
 """
-    update_hessian!(state, ::ExactHessian, f, adtype)
+    update_hessian_at_trial!(state, prob, hessian_update)
 
-Compute exact Hessian using automatic differentiation.
-
-Computes the full Hessian matrix via second-order AD. Most accurate but
-most expensive option. The Hessian is stored in the DiffResults buffer.
+Update Hessian approximation at the accepted trial point.
 """
-function update_hessian!(state::TrustRegionState, ::ExactHessian, f, adtype)
-    hessian!(f, state.diff_result, adtype, state.x)
+function update_hessian_at_trial!(state, prob, ::ExactHessian)
+    # Compute exact Hessian at new point using stored prep
+    _, _, hess_new = value_gradient_and_hessian(prob.f, state.x_trial)
+    state.hessian .= hess_new
     state.h_evals += 1
 end
+
+function update_hessian_at_trial!(state, prob, ::GaussNewtonUpdate)
+    # Gauss-Newton: prob.f is the residual function
+    y, grad, hess = compute_gauss_newton_hessian(prob.f, state.x_trial)
+    state.hessian .= hess
+    state.h_evals += 1
+end
+
+function update_hessian_at_trial!(state, prob, update::ApproximatingHessianUpdate)
+    # Quasi-Newton update
+    update_hessian_approx!(state, update)
+end
+
+# """
+#     update_hessian!(state, ::BFGSUpdate, objective)
+
+# Update Hessian approximation using the BFGS formula.
+
+# BFGS (Broyden-Fletcher-Goldfarb-Shanno) is a rank-2 update that maintains
+# positive-definiteness and symmetry. It's the most robust quasi-Newton method
+# for most optimization problems.
+
+# The update satisfies the secant equation: H_new * s = y
+# where s is the step and y is the gradient difference.
+# """
+# function update_hessian!(state::TrustRegionState, ::BFGSUpdate, objective::RealObjective)
+#     s = state.step_reflected
+
+#     # Compute gradient difference
+#     y = state.Δg
+#     y .= gx_trial(state) .- gx(state)
+#     sy = dot(s, y)
+#     T = eltype(s)
+    
+#     if sy > eps(T) * norm(s) * norm(y)
+#         H = state.Hx_approx
+#         mul!(state.Hs, H, s)
+#         sHs = dot(s, state.Hs)
+        
+#         if sHs > eps(T)
+#             # In-place BFGS update: H_new = H - (Hs)(Hs)'/sHs + yy'/sy
+#             H .-= (state.Hs * state.Hs') ./ sHs
+#             H .+= (y * y') ./ sy
+#         end
+#     end
+# end
+
+# """
+#     update_hessian!(state, ::SR1Update, objective)
+
+# Update Hessian approximation using the SR1 (Symmetric Rank-1) formula.
+
+# SR1 can better capture indefinite Hessians than BFGS but may lose
+# positive-definiteness. The update is skipped if it would be too small
+# or degenerate.
+
+# The update satisfies: H_new * s = y
+# """
+# function update_hessian!(state::TrustRegionState, ::SR1Update, objective::RealObjective)
+#     s = state.step_reflected
+    
+#     # Compute gradient difference
+#     y = state.Δg
+#     y .= gx_trial(state) .- gx(state)
+    
+#     H = state.Hx_approx
+#     mul!(state.Hs, H, s)
+    
+#     # Compute r = y - Hs
+#     r = state.Δg
+#     @. r = y - state.Hs
+    
+#     rs = dot(r, s)
+#     T = eltype(s)
+    
+#     if abs(rs) > eps(T) * norm(r) * norm(s)
+#         # In-place SR1 update: H_new = H + rr'/rs
+#         H .+= (r * r') ./ rs
+#     end
+# end
+
+# """
+#     update_hessian!(state, ::ExactHessian, objective)
+
+# Compute exact Hessian using automatic differentiation.
+
+# Computes the full Hessian matrix via second-order AD. Most accurate but
+# most expensive option. The Hessian is stored in the DiffResults buffer.
+# """
+# function update_hessian!(state::TrustRegionState, ::ExactHessian, objective::RealObjective)
+#     hessian!(objective, state.diff_result, state.x)
+#     state.h_evals += 1
+# end

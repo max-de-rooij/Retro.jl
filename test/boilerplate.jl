@@ -7,4 +7,7 @@
     result = solve(prob, BFGSUpdate(), TwoDimSubspace(); maxiter=2)
     @test !result.converged
     @test result.termination_reason == :maxiter
+
+    result = solve(prob, BFGSUpdate(), TwoDimSubspace(); maxiter=100, verbose=true)
+    @test result.converged
 end

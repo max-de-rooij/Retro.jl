@@ -4,6 +4,10 @@ using Retro, Test, ForwardDiff, BenchmarkTools
     include("boilerplate.jl")
 end
 
+@testset "Error Call Tests" begin
+    include("error_calls.jl")
+end
+
 @testset "Differentiation Interface Tests" begin
     include("differentiation.jl")
 end

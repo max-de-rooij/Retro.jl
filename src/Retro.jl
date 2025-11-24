@@ -46,7 +46,7 @@ include("gauss_newton.jl")
 include("solve.jl")
 
 export RetroProblem, solve, RetroOptions
-export BFGSUpdate, SR1Update, ExactHessian, GaussNewtonUpdate, HybridUpdate
+export BFGSUpdate, SR1Update, ExactHessian, GaussNewtonUpdate
 export TwoDimSubspace, CGSubspace, FullSpace
 export EigenvalueSolver, CauchyPointSolver
 export analyze_result

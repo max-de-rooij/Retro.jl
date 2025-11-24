@@ -10,6 +10,71 @@ abstract type ApproximatingHessianUpdate <: AbstractHessianUpdate end
 abstract type AbstractSubspace end
 abstract type AbstractSubproblemSolver end
 
+abstract type AbstractObjective end
+
+struct RealObjective{F, ADT} <: AbstractObjective 
+    f::F
+    adtype::ADT
+    prep_g
+    prep_h
+
+    function RealObjective(f::F, adtype::ADT, x0) where {F, ADT}
+        
+        # check if the function returns a scalar
+        if !(isa(f(x0), Real))
+            throw(ArgumentError("Objective function must return a scalar value."))
+        end
+
+        # prepare AD objects
+        prep_g = prepare_gradient(f, adtype, x0)
+        prep_h = prepare_hessian(f, adtype, x0)
+
+        new{F, ADT}(f, adtype, prep_g, prep_h)
+
+    end
+
+end
+
+struct VectorObjective{F, ADT} <: AbstractObjective
+    f::F
+    adtype::ADT
+    prep_j
+
+    function VectorObjective(f::F, adtype::ADT, x0) where {F, ADT}
+        
+        # check if the function returns a vector
+        if !(isa(f(x0), AbstractVector{<:Real}))
+            throw(ArgumentError("Residual function must return a vector of residuals."))
+        end
+
+        # prepare AD object for Jacobian
+        prep_j = prepare_jacobian(f, adtype, x0)
+
+        new{F, ADT}(f, adtype, prep_j)
+
+    end
+end
+
+(obj::RealObjective)(x) = obj.f(x)
+(obj::VectorObjective)(x) = obj.f(x)
+
+# Define AD interface methods for RealObjective and VectorObjective
+DifferentiationInterface.gradient(obj::RealObjective, x) = 
+    DifferentiationInterface.gradient(obj.f, obj.prep_g, obj.adtype, x)
+DifferentiationInterface.hessian(obj::RealObjective, x) = 
+    DifferentiationInterface.hessian(obj.f, obj.prep_h, obj.adtype, x)
+DifferentiationInterface.value_and_gradient(obj::RealObjective, x) = 
+    DifferentiationInterface.value_and_gradient(obj.f, obj.prep_g, obj.adtype, x)
+DifferentiationInterface.value_gradient_and_hessian(obj::RealObjective, x) = 
+    DifferentiationInterface.value_gradient_and_hessian(obj.f, obj.prep_h, obj.adtype, x)
+
+DifferentiationInterface.jacobian(obj::VectorObjective, x) = 
+    DifferentiationInterface.jacobian(obj.f, obj.prep_j, obj.adtype, x)
+DifferentiationInterface.value_and_jacobian(obj::VectorObjective, x) = 
+    DifferentiationInterface.value_and_jacobian(obj.f, obj.prep_j, obj.adtype, x)
+
+
+
 """
     BFGSUpdate <: ApproximatingHessianUpdate
 
@@ -44,34 +109,36 @@ where accuracy is critical.
 struct ExactHessian <: ExactHessianUpdate end
 
 """
-    GaussNewtonUpdate <: ExactHessianUpdate
+    GaussNewtonUpdate <: ApproximatingHessianUpdate
 
 Gauss-Newton Hessian approximation for least-squares problems.
 
 For objectives of the form `f(x) = 0.5 * ||r(x)||²`, approximates the Hessian as
 `H ≈ J'*J` where J is the Jacobian of the residual vector r(x).
 
-This is particularly effective when residuals are small near the solution.
-Requires the user to provide a function that returns residual vector.
+**Important:** When using `GaussNewtonUpdate`, `prob.f` must be the **residual function**
+r(x) that returns a vector, not a scalar objective. The implicit objective being minimized
+is 0.5*||r(x)||².
 
-# Fields
-- `resfun`: Function that computes residuals: `r = resfun(x)`
+This is particularly effective when residuals are small near the solution.
 
 # Example
 ```julia
-# Residual function
-residuals(x) = x .- [1.0, 2.0]
-# Objective function (for other methods)
-objective(x) = 0.5 * sum(abs2, residuals(x))
-# Create problem with objective
-prob = RetroProblem(objective, x0, AutoForwardDiff())
-# Use Gauss-Newton with residual function
-result = solve(prob, GaussNewtonUpdate(residuals), TwoDimSubspace())
+# Define residual function (not scalar objective!)
+residuals(x) = [10.0 * (x[2] - x[1]^2), 1.0 - x[1]]  # Rosenbrock as sum of squares
+
+# prob.f is the RESIDUAL function
+prob = RetroProblem(residuals, [-1.2, 1.0], AutoForwardDiff())
+
+# Use Gauss-Newton
+result = solve(prob, GaussNewtonUpdate(), TwoDimSubspace())
 ```
+
+# Notes
+- More efficient than exact Hessian for large-residual problems
+- May converge slowly if residuals don't become small at solution
 """
-struct GaussNewtonUpdate{F} <: ExactHessianUpdate
-    resfun::F
-end
+struct GaussNewtonUpdate <: ApproximatingHessianUpdate end
 
 """
     EigenvalueSolver <: AbstractSubproblemSolver
@@ -276,11 +343,8 @@ function initialize_cg_workspace!(cg::CGSubspace{T, VT}, n::Int, ::Type{T2}) whe
     end
 end
 
-
-
-
 """
-    RetroProblem{F, X, ADT, LB, UB}
+    RetroProblem{F, X, ADT}
 
 Define an optimization problem for Retro.
 
@@ -300,16 +364,25 @@ and optional bound constraints.
     prob = RetroProblem(f, [0.0, 0.0], AutoForwardDiff(); lb=[-10.0, -10.0], ub=[10.0, 10.0])
     ```
 """
-struct RetroProblem{F, X, ADT}
-    f::F
+struct RetroProblem{OBJ<:AbstractObjective, X}
+    f::OBJ
     x0::X
-    adtype::ADT
     lb::X
     ub::X
     
-    function RetroProblem(f::F, x0::X, adtype::ADT; 
+    function RetroProblem(func::F, x0::X, adtype::ADT; 
                          lb::X=fill(eltype(x0)(-Inf), length(x0)), 
                          ub::X=fill(eltype(x0)(Inf), length(x0))) where {F, X, ADT}
+        
+        # Determine if function is likelihood or residual based on return type
+        test_output = func(x0)
+        if isa(test_output, Real)
+            f = RealObjective(func, adtype, x0)
+        elseif isa(test_output, AbstractVector{<:Real})
+            f = VectorObjective(func, adtype, x0)
+        else
+            throw(ArgumentError("Function must return either a scalar (for likelihood) or a vector (for residuals)."))
+        end
 
         # validate bounds
         if length(lb) != length(x0)
@@ -324,7 +397,7 @@ struct RetroProblem{F, X, ADT}
             throw(ArgumentError("Each lower bound must be less than the corresponding upper bound"))
         end
         
-        new{F, X, ADT}(f, x0, adtype, lb, ub)
+        new{typeof(f), X}(f, x0, lb, ub)
     end
 end
 
@@ -447,7 +520,6 @@ mutable struct TrustRegionState{T<:Real, VT<:AbstractVector{T}, MT<:AbstractMatr
     x::VT
     
     # Primal, gradient, and hessian buffers
-    prep # prep object for AD
     value::T
     grad::VT
     hessian::MT
@@ -506,7 +578,6 @@ end
 
 function TrustRegionState(
     x0::VT,
-    prep,
     value::T,
     grad::VT,
     hessian::MT,
@@ -555,7 +626,6 @@ function TrustRegionState(
     
     TrustRegionState{T, VT, MT}(
         copy(x0),
-        prep,
         value,
         copy(grad),
         copy(hessian),

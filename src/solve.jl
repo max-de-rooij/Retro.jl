@@ -134,10 +134,6 @@ function solve(
         # Note: subproblem_step_norm is already in scaled space from the subproblem solver
         old_radius = state.tr_radius
         update_trust_region_radius!(state, rho, subproblem_step_norm, options)
-        radius_updated = (state.tr_radius != old_radius)
-        
-        # Track radius updates for hybrid strategy (dispatched)
-        track_radius_update!(hessian_update, radius_updated)
 
         # Decide whether to accept step
         # Following ls_trf: reject if actual reduction is negative (f increased)
@@ -240,96 +236,28 @@ end
 # ============================================================================
 
 """
-    track_radius_update!(hessian_update, radius_updated)
-
-Track trust-region radius updates for hybrid strategies.
-Default is no-op for non-hybrid updates.
-"""
-track_radius_update!(::AbstractHessianUpdate, radius_updated::Bool) = nothing
-
-function track_radius_update!(hybrid::HybridUpdate, radius_updated::Bool)
-    if radius_updated
-        reset_hybrid_on_radius_update!(hybrid)
-    else
-        record_no_radius_update!(hybrid)
-    end
-end
-
-"""
     evaluate_trial_point!(state, prob, hessian_update)
 
 Evaluate function and gradient at trial point, respecting prep object type.
 Writes results to state.fx_trial and state.grad_trial.
 """
-function evaluate_trial_point!(state, prob, gn::GaussNewtonUpdate)
-    # For Gauss-Newton, recompute from residuals
-    r = gn.resfun(state.x_trial)
-    prep_jac = prepare_jacobian(gn.resfun, prob.adtype, state.x_trial)
-    _, jac = value_and_jacobian(gn.resfun, prep_jac, prob.adtype, state.x_trial)
+function evaluate_trial_point!(state, prob, ::GaussNewtonUpdate)
+    # For Gauss-Newton, prob.f is the residual function
+    r = prob.f(state.x_trial)
+    jac = jacobian(prob.f, state.x_trial)
     
     state.fx_trial[] = 0.5 * dot(r, r)
     mul!(state.grad_trial, jac', r)
 end
 
-function evaluate_trial_point!(state, prob, hybrid::HybridUpdate)
-    # Evaluate using the current active strategy
-    strategy = current_strategy(hybrid)
-    
-    # Special handling: if strategy is quasi-Newton but initial was not
-    if strategy isa ApproximatingHessianUpdate && !(hybrid.initial isa ApproximatingHessianUpdate)
-        # Switched to quasi-Newton from exact/GN - recompute without prep
-        state.fx_trial[], state.grad_trial = value_and_gradient(prob.f, prob.adtype, state.x_trial)
-        return
-    end
-    
-    evaluate_trial_point!(state, prob, strategy)
-end
-
 function evaluate_trial_point!(state, prob, ::ExactHessian)
     # For exact Hessian, prep is for Hessian computation - need separate gradient eval
-    state.fx_trial[], state.grad_trial = value_and_gradient(prob.f, prob.adtype, state.x_trial)
+    state.fx_trial[], state.grad_trial = value_and_gradient(prob.f, state.x_trial)
 end
 
 function evaluate_trial_point!(state, prob, ::ApproximatingHessianUpdate)
     # For quasi-Newton, use stored prep for consistency
-    state.fx_trial[], state.grad_trial = value_and_gradient(prob.f, state.prep, prob.adtype, state.x_trial)
-end
-
-"""
-    update_hessian_at_trial!(state, prob, hessian_update)
-
-Update Hessian approximation at the accepted trial point.
-"""
-function update_hessian_at_trial!(state, prob, ::ExactHessian)
-    # Compute exact Hessian at new point using stored prep
-    _, _, hess_new = value_gradient_and_hessian(prob.f, state.prep, prob.adtype, state.x_trial)
-    state.hessian .= hess_new
-    state.h_evals += 1
-end
-
-function update_hessian_at_trial!(state, prob, gn::GaussNewtonUpdate)
-    # Gauss-Newton: recompute from residuals at new point
-    y, grad, hess = compute_gauss_newton_hessian(gn.resfun, prob.adtype, state.x_trial)
-    state.hessian .= hess
-    state.h_evals += 1
-end
-
-function update_hessian_at_trial!(state, prob, update::ApproximatingHessianUpdate)
-    # Quasi-Newton update
-    update_hessian_approx!(state, update)
-end
-
-function update_hessian_at_trial!(state, prob, hybrid::HybridUpdate)
-    # Use current active strategy
-    strategy = current_strategy(hybrid)
-    
-    if strategy isa ApproximatingHessianUpdate
-        # Quasi-Newton: always update the approximation
-        update_hessian_approx!(state, strategy)
-    else
-        # Exact or Gauss-Newton: recompute
-        update_hessian_at_trial!(state, prob, strategy)
-    end
+    state.fx_trial[], state.grad_trial = value_and_gradient(prob.f, state.x_trial)
 end
 
 """
@@ -337,48 +265,46 @@ end
 
 Initialize the optimization state.
 """
-function initialize_state(prob::RetroProblem, gn::GaussNewtonUpdate, options::RetroOptions)
+function initialize_state(prob::RetroProblem{VectorObjective{F, ADT}, X}, ::GaussNewtonUpdate, options::RetroOptions) where {F, X, ADT}
     x0 = copy(prob.x0)
     tr_radius = options.initial_tr_radius
     
-    # Initialize using residual function
-    y, grad, hess = compute_gauss_newton_hessian(gn.resfun, prob.adtype, x0)
+    # Initialize using residual function (prob.f is the residual function)
+    y, grad, hess = compute_gauss_newton_hessian(prob.f, x0)
     
-    # For Gauss-Newton, we don't need prep since we recompute from residuals
-    prep = nothing
-    
-    return TrustRegionState(x0, prep, y, grad, hess, tr_radius, prob.lb, prob.ub)
+    return TrustRegionState(x0, y, grad, hess, tr_radius, prob.lb, prob.ub)
 end
 
-function initialize_state(prob::RetroProblem, hybrid::HybridUpdate, options::RetroOptions)
-    # Initialize using the initial strategy
-    return initialize_state(prob, hybrid.initial, options)
-end
-
-function initialize_state(prob::RetroProblem, ::ExactHessian, options::RetroOptions)
+function initialize_state(prob::RetroProblem{RealObjective{F, ADT}, X}, ::ExactHessian, options::RetroOptions) where {F, X, ADT}
     x0 = copy(prob.x0)
     tr_radius = options.initial_tr_radius
     
-    # Compute initial objective, gradient, and Hessian
-    prep = prepare_hessian(prob.f, prob.adtype, x0)
-    y, grad, hess = value_gradient_and_hessian(prob.f, prep, prob.adtype, x0)
+    y, grad, hess = value_gradient_and_hessian(prob.f, x0)
     
-    return TrustRegionState(x0, prep, y, grad, hess, tr_radius, prob.lb, prob.ub)
+    return TrustRegionState(x0, y, grad, hess, tr_radius, prob.lb, prob.ub)
 end
 
-function initialize_state(prob::RetroProblem, ::ApproximatingHessianUpdate, options::RetroOptions)
+function initialize_state(prob::RetroProblem{RealObjective{F, ADT}, X}, ::Union{BFGSUpdate, SR1Update}, options::RetroOptions) where {F, X, ADT}
     x0 = copy(prob.x0)
     tr_radius = options.initial_tr_radius
     
-    # For quasi-Newton, compute initial gradient only
-    prep = prepare_gradient(prob.f, prob.adtype, x0)
-    y, grad = value_and_gradient(prob.f, prep, prob.adtype, x0)
+    y, grad = value_and_gradient(prob.f, x0)
     
     # Initialize Hessian as identity
     n = length(x0)
     hess = Matrix{eltype(x0)}(I, n, n)
     
-    return TrustRegionState(x0, prep, y, grad, hess, tr_radius, prob.lb, prob.ub)
+    return TrustRegionState(x0, y, grad, hess, tr_radius, prob.lb, prob.ub)
+end
+
+function initialize_state(prob::RetroProblem, hessian_update::AbstractHessianUpdate, options::RetroOptions)
+    
+    if hessian_update isa GaussNewtonUpdate && prob.f isa RealObjective
+        throw(ArgumentError("Gauss-Newton update requires a vector-valued residual function in RetroProblem"))
+    else
+        throw(ArgumentError("Hessian update strategy $(typeof(hessian_update)) not compatible with problem objective type $(typeof(prob.f))"))
+    end
+
 end
 
 """
@@ -455,57 +381,6 @@ function update_trust_region_radius!(
 end
 
 """
-    update_hessian_approx!(state, update_type)
-
-Update quasi-Newton Hessian approximation.
-"""
-function update_hessian_approx!(::TrustRegionState, ::ExactHessianUpdate)
-    # No-op: Hessian is computed exactly at each iteration
-    nothing
-end
-
-function update_hessian_approx!(state::TrustRegionState, ::BFGSUpdate)
-    # Use the actual taken step (reflected), not the subproblem step
-    # This is the step from old x to new x
-    s = state.step_reflected
-    y = state.Δg
-    @. y = state.grad_trial - state.grad
-    
-    sy = dot(s, y)
-    T = eltype(s)
-    
-    if sy > eps(T) * norm(s) * norm(y)
-        H = state.hessian
-        mul!(state.Hs, H, s)
-        sHs = dot(s, state.Hs)
-        
-        if sHs > eps(T)
-            # BFGS update: H_new = H - (Hs)(Hs)'/sHs + yy'/sy
-            H .-= (state.Hs * state.Hs') ./ sHs
-            H .+= (y * y') ./ sy
-        end
-    end
-end
-
-function update_hessian_approx!(state::TrustRegionState, ::SR1Update)
-    # Use the actual taken step (reflected), not the subproblem step
-    s = state.step_reflected
-    y = state.Δg
-    @. y = state.grad_trial - state.grad
-    
-    H = state.hessian
-    mul!(state.Hs, H, s)
-    r = y .- state.Hs
-    rs = dot(r, s)
-    T = eltype(s)
-    
-    if abs(rs) > eps(T) * norm(r) * norm(s)
-        # SR1 update: H_new = H + rr'/rs
-        H .+= (r * r') ./ rs
-    end
-end
-
-"""
     check_convergence(state, iter, options, fx_change, step_norm)
 
 Check convergence criteria.
@@ -577,17 +452,17 @@ end
 # ============================================================================
 
 function log_header()
-    println("iter |    fval    |  ||g||∞  | tr_radius | ||step|| |   ρ   | acc")
-    println("-----|------------|----------|-----------|----------|-------|----")
+    println("iter |   fval   |  ||g||∞  | tr_radius | ||step|| |   ρ   | acc")
+    println("-----|----------|----------|-----------|----------|-------|----")
 end
 
 function log_step(iter, fval, gnorm, tr_radius, step_norm, rho, accepted)
     iter_str = lpad(iter, 4)
     fval_str = @sprintf("%.2E", fval)
     gnorm_str = @sprintf("%.2E", gnorm)
-    tr_str = @sprintf("%.2E", tr_radius)
+    tr_str = @sprintf("%.3E", tr_radius)
     step_str = iter > 0 ? @sprintf("%.2E", step_norm) : "  ---   "
-    rho_str = iter > 0 ? @sprintf("%+.2f", rho) : " ---  "
+    rho_str = iter > 0 ? @sprintf("%+.2f", rho) : " --- "
     acc_str = accepted ? " ✓ " : " ✗ "
     
     println("$iter_str | $fval_str | $gnorm_str | $tr_str | $step_str | $rho_str | $acc_str")
