@@ -34,6 +34,9 @@ using LinearAlgebra
 using DifferentiationInterface
 using DifferentiationInterface: Constant
 using Printf
+using QuasiMonteCarlo
+using Random
+using ProgressMeter
 import ForwardDiff
 import BracketingNonlinearSolve as NLS
 
@@ -44,15 +47,17 @@ include("subproblem.jl")
 include("hessian.jl")
 include("gauss_newton.jl")
 include("solve.jl")
+include("global.jl")
 
 export RetroProblem, solve, RetroOptions
 export BFGSUpdate, SR1Update, ExactHessian, GaussNewtonUpdate
 export TwoDimSubspace, CGSubspace, FullSpace
 export EigenvalueSolver, CauchyPointSolver
+export globalsolve, LatinHypercubeSampling
 export analyze_result
 
 using Reexport
-@reexport using DifferentiationInterface: AutoForwardDiff, AutoReverseDiff, AutoZygote
+@reexport using DifferentiationInterface: AutoForwardDiff, AutoReverseDiff, AutoZygote, AutoMooncake, AutoMooncakeForward, AutoFiniteDiff
 
 """
     analyze_result(result::RetroResult)

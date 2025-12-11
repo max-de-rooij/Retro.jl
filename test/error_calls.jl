@@ -14,4 +14,9 @@
     @test_throws ArgumentError solve(prob_gn, SR1Update(), TwoDimSubspace(); maxiter=10000, verbose=false)
     @test_throws ArgumentError solve(prob_gn, ExactHessian(), TwoDimSubspace(); maxiter=10000, verbose=false)
 
+    # Mooncake AD with ExactHessian
+    import Mooncake
+    prob_mooncake = RetroProblem(f, x0, AutoMooncakeForward())
+    @test_throws ArgumentError solve(prob_mooncake, ExactHessian(), TwoDimSubspace(); maxiter=10000, verbose=false)
+
 end

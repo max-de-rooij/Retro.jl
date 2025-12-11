@@ -1,4 +1,6 @@
-using Retro, Test, ForwardDiff, BenchmarkTools
+using Retro, Test, ForwardDiff
+
+# include("sir_model.jl")
 
 @testset "Boilerplate Tests" begin
     include("boilerplate.jl")

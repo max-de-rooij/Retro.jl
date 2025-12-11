@@ -12,27 +12,41 @@ abstract type AbstractSubproblemSolver end
 
 abstract type AbstractObjective end
 
+abstract type AbstractCandidateSelectionMethod end
+
 struct RealObjective{F, ADT} <: AbstractObjective 
     f::F
     adtype::ADT
     prep_g
     prep_h
+end
 
-    function RealObjective(f::F, adtype::ADT, x0) where {F, ADT}
-        
-        # check if the function returns a scalar
-        if !(isa(f(x0), Real))
-            throw(ArgumentError("Objective function must return a scalar value."))
-        end
-
-        # prepare AD objects
-        prep_g = prepare_gradient(f, adtype, x0)
-        prep_h = prepare_hessian(f, adtype, x0)
-
-        new{F, ADT}(f, adtype, prep_g, prep_h)
-
+function RealObjective(f::F, adtype::ADT, x0) where {F, ADT}
+    
+    # check if the function returns a scalar
+    if !(isa(f(x0), Real))
+        throw(ArgumentError("Objective function must return a scalar value."))
     end
 
+    # prepare AD objects
+    prep_g = prepare_gradient(f, adtype, x0)
+    prep_h = prepare_hessian(f, adtype, x0)
+
+    RealObjective{F, ADT}(f, adtype, prep_g, prep_h)
+
+end
+
+function RealObjective(f::F, adtype::ADT, x0) where {F, ADT<:Union{AutoMooncake, AutoMooncakeForward}}
+
+    # check if the function returns a scalar
+    if !(isa(f(x0), Real))
+        throw(ArgumentError("Objective function must return a scalar value."))
+    end
+    @info "Mooncake AD detected: Only gradient computations are supported. Gradient preparation may take some time." 
+    # prepare AD objects
+    prep_g = prepare_gradient(f, adtype, x0)
+    RealObjective{F, ADT}(f, adtype, prep_g, nothing)
+     
 end
 
 struct VectorObjective{F, ADT} <: AbstractObjective
@@ -343,6 +357,13 @@ function initialize_cg_workspace!(cg::CGSubspace{T, VT}, n::Int, ::Type{T2}) whe
     end
 end
 
+struct RetroProblem{OBJ<:AbstractObjective, X}
+    f::OBJ
+    x0::X
+    lb::X
+    ub::X
+end
+
 """
     RetroProblem{F, X, ADT}
 
@@ -364,41 +385,34 @@ and optional bound constraints.
     prob = RetroProblem(f, [0.0, 0.0], AutoForwardDiff(); lb=[-10.0, -10.0], ub=[10.0, 10.0])
     ```
 """
-struct RetroProblem{OBJ<:AbstractObjective, X}
-    f::OBJ
-    x0::X
-    lb::X
-    ub::X
+function RetroProblem(func::F, x0::X, adtype::ADT; 
+                        lb::X=fill(eltype(x0)(-Inf), length(x0)), 
+                        ub::X=fill(eltype(x0)(Inf), length(x0))) where {F, X, ADT}
     
-    function RetroProblem(func::F, x0::X, adtype::ADT; 
-                         lb::X=fill(eltype(x0)(-Inf), length(x0)), 
-                         ub::X=fill(eltype(x0)(Inf), length(x0))) where {F, X, ADT}
-        
-        # Determine if function is likelihood or residual based on return type
-        test_output = func(x0)
-        if isa(test_output, Real)
-            f = RealObjective(func, adtype, x0)
-        elseif isa(test_output, AbstractVector{<:Real})
-            f = VectorObjective(func, adtype, x0)
-        else
-            throw(ArgumentError("Function must return either a scalar (for likelihood) or a vector (for residuals)."))
-        end
-
-        # validate bounds
-        if length(lb) != length(x0)
-            throw(ArgumentError("Length of lower bounds must match length of x0"))
-        end
-
-        if length(ub) != length(x0)
-            throw(ArgumentError("Length of upper bounds must match length of x0"))
-        end
-
-        if any(lb .>= ub)
-            throw(ArgumentError("Each lower bound must be less than the corresponding upper bound"))
-        end
-        
-        new{typeof(f), X}(f, x0, lb, ub)
+    # Determine if function is likelihood or residual based on return type
+    test_output = func(x0)
+    if isa(test_output, Real)
+        f = RealObjective(func, adtype, x0)
+    elseif isa(test_output, AbstractVector{<:Real})
+        f = VectorObjective(func, adtype, x0)
+    else
+        throw(ArgumentError("Function must return either a scalar (for likelihood) or a vector (for residuals)."))
     end
+
+    # validate bounds
+    if length(lb) != length(x0)
+        throw(ArgumentError("Length of lower bounds must match length of x0"))
+    end
+
+    if length(ub) != length(x0)
+        throw(ArgumentError("Length of upper bounds must match length of x0"))
+    end
+
+    if any(lb .>= ub)
+        throw(ArgumentError("Each lower bound must be less than the corresponding upper bound"))
+    end
+    
+    RetroProblem{typeof(f), X}(f, x0, lb, ub)
 end
 
 """
@@ -642,3 +656,6 @@ function TrustRegionState(
         cauchy_d, Hd_buffer  # Cauchy point buffers
     )
 end
+
+
+

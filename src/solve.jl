@@ -12,12 +12,14 @@ Solve a bound-constrained optimization problem using trust-region methods.
 
 # Arguments
 - `prob::RetroProblem`: The optimization problem to solve
-- `hessian_update::AbstractHessianUpdate`: Hessian approximation strategy
-  - `BFGSUpdate()`: Quasi-Newton BFGS (recommended for most problems)
+- `hessian_update::AbstractHessianUpdate`: Hessian approximation strategy.
+  - `BFGSUpdate()` [default]: Quasi-Newton BFGS (recommended for most problems)
   - `SR1Update()`: Symmetric Rank-1 (good for indefinite problems)
   - `ExactHessian()`: Compute exact Hessian via AD (expensive but accurate)
+  - `GaussNewtonUpdate()`: Gauss-Newton Hessian for least-squares problems
+
 - `subspace::AbstractSubspace`: Trust-region subproblem solver
-  - `TwoDimSubspace()`: 2D subspace method (good balance, default)
+  - `TwoDimSubspace()` [default]: 2D subspace method (good balance, default)
   - `CGSubspace([maxiter])`: Conjugate gradient (good for large problems)
   - `FullSpace()`: Full-dimensional solve (accurate but expensive)
 
@@ -44,8 +46,8 @@ result = solve(prob, BFGSUpdate(), TwoDimSubspace(); verbose=true)
 """
 function solve(
     prob::RetroProblem,
-    hessian_update::AbstractHessianUpdate,
-    subspace::AbstractSubspace;
+    hessian_update::AbstractHessianUpdate = BFGSUpdate(),
+    subspace::AbstractSubspace = TwoDimSubspace();
     maxiter::Int = 1000,
     verbose::Bool = false,
     options::RetroOptions = RetroOptions()
@@ -282,6 +284,10 @@ function initialize_state(prob::RetroProblem{RealObjective{F, ADT}, X}, ::ExactH
     y, grad, hess = value_gradient_and_hessian(prob.f, x0)
     
     return TrustRegionState(x0, y, grad, hess, tr_radius, prob.lb, prob.ub)
+end
+
+function initialize_state(::RetroProblem{RealObjective{F, ADT}, X}, ::ExactHessian, ::RetroOptions) where {F, X, ADT<:Union{AutoMooncake, AutoMooncakeForward}}
+    throw(ArgumentError("ExactHessian is not supported with Mooncake AD due to lack of Hessian support"))
 end
 
 function initialize_state(prob::RetroProblem{RealObjective{F, ADT}, X}, ::Union{BFGSUpdate, SR1Update}, options::RetroOptions) where {F, X, ADT}

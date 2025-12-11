@@ -1,4 +1,4 @@
-import ReverseDiff, Zygote
+import ReverseDiff, Zygote, Mooncake, FiniteDiff, FiniteDifferences
 
 # define simple quadratic function
 square(x) = sum(x.^2)
@@ -27,5 +27,38 @@ end
     @test isapprox(result.x, [0.0, 0.0]; atol=1e-3)
     @test isapprox(result.fx, 0.0; atol=1e-6)
 end
+
+@testset "AutoMooncake Forward" begin
+    prob = RetroProblem(square, x0, AutoMooncakeForward())
+    result = solve(prob, BFGSUpdate(), TwoDimSubspace())
+    @test result.converged
+    @test isapprox(result.x, [0.0, 0.0]; atol=1e-3)
+    @test isapprox(result.fx, 0.0; atol=1e-6)
+end
+
+@testset "AutoMooncake" begin
+    prob = RetroProblem(square, x0, AutoMooncake())
+    result = solve(prob, BFGSUpdate(), TwoDimSubspace())
+    @test result.converged
+    @test isapprox(result.x, [0.0, 0.0]; atol=1e-3)
+    @test isapprox(result.fx, 0.0; atol=1e-6)
+end
+
+@testset "AutoFiniteDiff" begin
+    prob = RetroProblem(square, x0, AutoFiniteDiff())
+    result = solve(prob, BFGSUpdate(), TwoDimSubspace())
+    @test result.converged
+    @test isapprox(result.x, [0.0, 0.0]; atol=1e-3)
+    @test isapprox(result.fx, 0.0; atol=1e-6)
+end
+
+# @testset "AutoFiniteDifferences" begin
+#     prob = RetroProblem(square, x0, AutoFiniteDifferences(5))
+#     result = solve(prob, BFGSUpdate(), TwoDimSubspace())
+#     @test result.converged
+#     @test isapprox(result.x, [0.0, 0.0]; atol=1e-3)
+#     @test isapprox(result.fx, 0.0; atol=1e-6)
+# end
+
 
 
