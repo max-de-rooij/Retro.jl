@@ -2,8 +2,8 @@
 
 <img src="assets/retro_logo.svg" alt="Retro Logo" width="300"/>
 
-> ![WARNING]
-> The optimizer is still under development. Use with caution! Please report any issues you encounter.
+> [!WARNING]
+> The optimizer is still under development, and has not been fully tested, yet. Use with caution.
 
 Retro (REflective-bounds Trust-Region Optimizer): A high-performance Julia package for bound-constrained optimization using trust-region reflective methods.
 
