@@ -49,11 +49,12 @@ include("gauss_newton.jl")
 include("solve.jl")
 include("global.jl")
 
-export RetroProblem, solve, RetroOptions
+export RetroProblem, RetroOptions
 export BFGSUpdate, SR1Update, ExactHessian, GaussNewtonUpdate
 export TwoDimSubspace, CGSubspace, FullSpace
 export EigenvalueSolver, CauchyPointSolver
-export globalsolve, LatinHypercubeSampling
+export LatinHypercubeSampling
+export optimize, globaloptimize
 export analyze_result
 
 using Reexport

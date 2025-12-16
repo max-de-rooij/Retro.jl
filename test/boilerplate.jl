@@ -4,10 +4,10 @@
     f(x) = sum(x.^2)
     x0 = [1.0, 1.0]
     prob = RetroProblem(f, x0, AutoForwardDiff())
-    result = solve(prob, BFGSUpdate(), TwoDimSubspace(); maxiter=2)
+    result = optimize(prob, BFGSUpdate(), TwoDimSubspace(); maxiter=2)
     @test !result.converged
     @test result.termination_reason == :maxiter
 
-    result = solve(prob, BFGSUpdate(), TwoDimSubspace(); maxiter=100, verbose=true)
+    result = optimize(prob, BFGSUpdate(), TwoDimSubspace(); maxiter=100, verbose=true)
     @test result.converged
 end

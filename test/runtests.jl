@@ -18,3 +18,7 @@ end
     include("rosenbrock.jl")
 end
 
+@testset "Global Optimization Tests" begin
+    include("global.jl")
+end
+

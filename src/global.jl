@@ -1,6 +1,6 @@
 # global solve for Retro.jl
 """
-    globalsolve(prob::RetroProblem,
+    globaloptimize(prob::RetroProblem,
     sample_size::Int, selection_method::AbstractCandidateSelectionMethod 
     ; kwargs...)
 
@@ -10,7 +10,7 @@ Solve a bound-constrained optimization problem using trust-region methods.
 - `prob::RetroProblem`: The optimization problem to solve
 
 
-# Keyword Arguments for local solve calls
+# Keyword Arguments for local optimize calls
 - `hessian_update::AbstractHessianUpdate`: Hessian approximation strategy.
   - `BFGSUpdate()` [default]: Quasi-Newton BFGS (recommended for most problems)
   - `SR1Update()`: Symmetric Rank-1 (good for indefinite problems)
@@ -27,7 +27,7 @@ Solve a bound-constrained optimization problem using trust-region methods.
 # Returns
 - `RetroResult`: Contains solution, convergence info, and statistics
 """
-function globalsolve(
+function globaloptimize(
     prob::RetroProblem,
     sample_size::Int,
     selection_method::AbstractCandidateSelectionMethod;
@@ -51,7 +51,7 @@ for i in axes(candidates, 2)
     x0 = candidates[:, i]
     prob_local = RetroProblem(prob.f, x0, prob.lb, prob.ub)
     try
-        result = solve(
+        result = optimize(
             prob_local,
             hessian_update,
             subspace;

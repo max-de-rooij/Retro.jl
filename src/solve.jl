@@ -1,12 +1,12 @@
 """
     Trust-Region Optimization Main Loop
 
-Main solve function implementing the interior-point trust-region reflective
+Main optimize function implementing the interior-point trust-region reflective
 algorithm of Coleman & Li (1994, 1996).
 """
 
 """
-    solve(prob::RetroProblem, hessian_update, subspace; kwargs...)
+    optimize(prob::RetroProblem, hessian_update, subspace; kwargs...)
 
 Solve a bound-constrained optimization problem using trust-region methods.
 
@@ -26,6 +26,7 @@ Solve a bound-constrained optimization problem using trust-region methods.
 # Keyword Arguments
 - `maxiter::Int`: Maximum iterations (default: 1000)
 - `verbose::Bool`: Print iteration info (default: false)
+- `callback`::Function`: Function called at the end of each iteration with the current state (default: Retro.noop_callback)
 - `options::RetroOptions`: Algorithm parameters and tolerances
 
 # Returns
@@ -36,20 +37,21 @@ Solve a bound-constrained optimization problem using trust-region methods.
 # Simple unconstrained problem
 f(x) = sum(abs2, x)
 prob = RetroProblem(f, [1.0, 2.0], AutoForwardDiff())
-result = solve(prob, BFGSUpdate(), TwoDimSubspace())
+result = optimize(prob, BFGSUpdate(), TwoDimSubspace())
 
 # Rosenbrock with bounds
 f(x) = 100(x[2] - x[1]^2)^2 + (1 - x[1])^2
 prob = RetroProblem(f, [-1.2, 1.0], AutoForwardDiff(); lb=[-2.0, -2.0], ub=[2.0, 2.0])
-result = solve(prob, BFGSUpdate(), TwoDimSubspace(); verbose=true)
+result = optimize(prob, BFGSUpdate(), TwoDimSubspace(); verbose=true)
 ```
 """
-function solve(
+function optimize(
     prob::RetroProblem,
     hessian_update::AbstractHessianUpdate = BFGSUpdate(),
     subspace::AbstractSubspace = TwoDimSubspace();
     maxiter::Int = 1000,
     verbose::Bool = false,
+    callback::Function = noop_callback,
     options::RetroOptions = RetroOptions()
 )
     T = eltype(prob.x0)
@@ -220,6 +222,20 @@ function solve(
                 false, :tr_radius_too_small
             )
         end
+
+        # Call user callback with current state
+        callback_continue = callback(state)
+        if !callback_continue
+            if verbose
+                println("Optimization terminated by user callback at iteration $iter")
+            end
+            return RetroResult(
+                state.x, state.value, copy(state.grad), iter,
+                state.f_evals, state.g_evals, state.h_evals,
+                false, :callback
+            )
+        end
+        
     end
 
     # Maximum iterations reached
@@ -236,6 +252,14 @@ end
 # ============================================================================
 # Helper Functions
 # ============================================================================
+"""
+    noop_callback(state::TrustRegionState)
+
+A no-operation callback function that always returns true. 
+"""
+@inline function noop_callback(::TrustRegionState)
+    return true
+end
 
 """
     evaluate_trial_point!(state, prob, hessian_update)
