@@ -24,7 +24,6 @@ Retro (REflective-bounds Trust-Region Optimizer): A high-performance Julia packa
 - **Flexible Subproblem Solvers**: 2D subspace, Conjugate Gradient, and full-space eigenvalue solvers
 - **Bound Constraints**: Interior-point reflective method (Coleman-Li algorithm)
 - **Automatic Differentiation**: Seamless integration via DifferentiationInterface
-- **Least-Squares Support**: Specialized Gauss-Newton for residual formulations
   
 ## Quick Start
 
