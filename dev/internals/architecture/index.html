@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Architecture · Retro.jl</title><meta name="title" content="Architecture · Retro.jl"/><meta property="og:title" content="Architecture · Retro.jl"/><meta property="twitter:title" content="Architecture · Retro.jl"/><meta name="description" content="Documentation for Retro.jl."/><meta property="og:description" content="Documentation for Retro.jl."/><meta property="twitter:description" content="Documentation for Retro.jl."/><meta property="og:url" content="https://max-de-rooij.github.io/Retro.jl/stable/internals/architecture/"/><meta property="twitter:url" content="https://max-de-rooij.github.io/Retro.jl/stable/internals/architecture/"/><link rel="canonical" href="https://max-de-rooij.github.io/Retro.jl/stable/internals/architecture/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><script src="../../assets/custom.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Retro.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-2" type="checkbox"/><label class="tocitem" for="menuitem-2"><span class="docs-label">Getting Started</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../getting-started/quickstart/">Quick Start</a></li><li><a class="tocitem" href="../../getting-started/examples/">Examples</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox"/><label class="tocitem" for="menuitem-3"><span class="docs-label">Algorithm Tutorial</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../guide/overview/">Overview</a></li><li><a class="tocitem" href="../../guide/basic-optimizer/">The Simplest Optimizer</a></li><li><a class="tocitem" href="../../guide/trust-region/">Adding Trust Regions</a></li><li><a class="tocitem" href="../../guide/reflective-bounds/">Handling Bounds</a></li><li><a class="tocitem" href="../../guide/subspaces/">Working in Subspaces</a></li><li><a class="tocitem" href="../../guide/hessian-approximations/">Hessian Approximations</a></li><li><a class="tocitem" href="../../guide/robustness/">Robustness &amp; Fallbacks</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">How-To Guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/bounded-problems/">Bounded Problems</a></li><li><a class="tocitem" href="../../howto/autodiff/">Automatic Differentiation</a></li><li><a class="tocitem" href="../../howto/large-scale/">Large-Scale Problems</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API Reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../api/problems/">Problems &amp; Results</a></li><li><a class="tocitem" href="../../api/objectives/">Objective Functions</a></li><li><a class="tocitem" href="../../api/hessians/">Hessian Methods</a></li><li><a class="tocitem" href="../../api/subspaces/">Subspace Methods</a></li><li><a class="tocitem" href="../../api/solvers/">TR Solvers</a></li><li><a class="tocitem" href="../../api/bounds/">Bounds &amp; Reflection</a></li><li><a class="tocitem" href="../../api/options/">Options &amp; Display</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox" checked/><label class="tocitem" for="menuitem-6"><span class="docs-label">Internals</span><i class="docs-chevron"></i></label><ul class="collapsed"><li class="is-active"><a class="tocitem" href>Architecture</a><ul class="internal"><li><a class="tocitem" href="#Module-structure"><span>Module structure</span></a></li><li><a class="tocitem" href="#Type-hierarchy"><span>Type hierarchy</span></a></li><li><a class="tocitem" href="#One-iteration,-step-by-step"><span>One iteration, step by step</span></a></li><li><a class="tocitem" href="#Dispatch-pattern"><span>Dispatch pattern</span></a></li><li><a class="tocitem" href="#Key-design-decisions"><span>Key design decisions</span></a></li></ul></li><li><a class="tocitem" href="../trust-region-dynamics/">Trust-Region Dynamics</a></li><li><a class="tocitem" href="../cache-design/">Cache &amp; Allocation Design</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Internals</a></li><li class="is-active"><a href>Architecture</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Architecture</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/max-de-rooij/Retro.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/max-de-rooij/Retro.jl/blob/main/docs/src/internals/architecture.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Internals-—-Architecture"><a class="docs-heading-anchor" href="#Internals-—-Architecture">Internals — Architecture</a><a id="Internals-—-Architecture-1"></a><a class="docs-heading-anchor-permalink" href="#Internals-—-Architecture" title="Permalink"></a></h1><p>This page is for <strong>contributors and researchers</strong> who want to understand how Retro&#39;s source code is organized.</p><h2 id="Module-structure"><a class="docs-heading-anchor" href="#Module-structure">Module structure</a><a id="Module-structure-1"></a><a class="docs-heading-anchor-permalink" href="#Module-structure" title="Permalink"></a></h2><pre><code class="nohighlight hljs">src/
+├── Retro.jl                 # Module root: imports, includes, exports
+├── types.jl                 # Abstract type hierarchy
+├── objective.jl             # ADObjectiveFunction, gradient!, hessian!, …
+├── optimize.jl              # Main loop, RetroOptions, convergence checks
+│
+├── problem/
+│   ├── RetroProblem.jl      # Problem struct + convenience constructors
+│   ├── RetroCache.jl        # Pre-allocated workspace
+│   └── RetroResult.jl       # Immutable result container
+│
+├── hessian/
+│   ├── BFGS.jl              # Damped BFGS with Powell damping
+│   ├── SR1.jl               # Memoryless symmetric rank-1
+│   └── ExactHessian.jl      # Full Hessian via DI with caching
+│
+├── subspace/
+│   ├── TwoDimSubspace.jl    # 2-D eigenvalue TR solve (StaticArrays)
+│   ├── CGSubspace.jl        # Steihaug–Toint truncated CG
+│   └── FullSpace.jl         # Full n-D eigendecomposition
+│
+├── trsolver/
+│   ├── EigenTRSolver.jl     # Eigenvalue TR solver (Newton → Brent → Cauchy)
+│   ├── CauchyTRSolver.jl    # Cauchy (steepest descent) point
+│   └── BrentTRSolver.jl     # Brent line search along a direction
+│
+├── steps/
+│   ├── Reflection.jl        # Coleman–Li reflective bounds
+│   ├── StepAcceptance.jl    # ρ ratio, radius update, convergence
+│   └── TrustRegionStep.jl   # Orchestrates subspace → TR solve → reflection
+│
+└── utils/
+    ├── LinearAlgebraHelpers.jl   # safe_norm, safe_dot, etc.
+    ├── Norms.jl                  # Specialised norm functions
+    └── Displays.jl               # Silent/Iteration/Final/Verbose + ProgressMeter</code></pre><h2 id="Type-hierarchy"><a class="docs-heading-anchor" href="#Type-hierarchy">Type hierarchy</a><a id="Type-hierarchy-1"></a><a class="docs-heading-anchor-permalink" href="#Type-hierarchy" title="Permalink"></a></h2><pre><code class="nohighlight hljs">AbstractObjectiveFunction
+├── ADObjectiveFunction          (AD gradient + Hessian)
+├── GradientObjectiveFunction    (user gradient, AD Hessian)
+└── AnalyticObjectiveFunction    (all user-supplied)
+
+AbstractHessianApproximation
+├── BFGS
+├── SR1
+└── ExactHessian
+
+AbstractSubspace
+├── TwoDimSubspace
+├── CGSubspace
+└── FullSpace
+
+AbstractTRSolver
+├── EigenTRSolver
+├── CauchyTRSolver
+└── BrentTRSolver
+
+AbstractDisplayMode
+├── Silent
+├── Iteration
+├── Final
+└── Verbose</code></pre><h2 id="One-iteration,-step-by-step"><a class="docs-heading-anchor" href="#One-iteration,-step-by-step">One iteration, step by step</a><a id="One-iteration,-step-by-step-1"></a><a class="docs-heading-anchor-permalink" href="#One-iteration,-step-by-step" title="Permalink"></a></h2><p>The <code>optimize</code> loop in <a href="https://github.com/max-de-rooij/Retro.jl/blob/main/src/optimize.jl">optimize.jl</a> does the following on every iteration:</p><pre><code class="nohighlight hljs">1.  check_convergence(g, p, …, options)
+        → return if converged
+
+2.  update_hessian!(hess_approx, state, cache, obj, x)
+        → BFGS rank-2 update  /  SR1 rank-1 update  /  exact Hessian eval
+
+3.  compute_trust_region_step!(cache, prob, subspace, …, x, Δ, options)
+        a. compute_scaling!(scaling, x, lb, ub, θ₁, θ₂)
+        b. scale_gradient!(scaled_g, g, scaling)
+        c. build_subspace!(subspace, state, cache, hess, …, x)
+        d. solve_subspace_tr!(solver, subspace, state, cache, Δ)
+        e. apply inverse scaling to step p
+        f. apply_reflective_bounds!(x_trial, x, p, lb, ub, θ₂; g)
+
+4.  compute_hv_product!(tmp, hess, state, cache, p)
+5.  predicted_reduction(g, p, tmp)
+6.  f_trial = objfunc!(cache, obj, x_trial)
+7.  actual_reduction(f_current, f_trial)
+8.  ρ = actual / predicted
+
+9.  if accept_step(ρ, μ):
+        x ← x_trial
+        f_current ← value_and_gradient!(g, cache, obj, x)
+
+10. Δ ← update_trust_region_radius(Δ, ρ, step_norm, μ, η, γ₁, γ₂, Δ_max)</code></pre><h2 id="Dispatch-pattern"><a class="docs-heading-anchor" href="#Dispatch-pattern">Dispatch pattern</a><a id="Dispatch-pattern-1"></a><a class="docs-heading-anchor-permalink" href="#Dispatch-pattern" title="Permalink"></a></h2><p>Retro uses <strong>Julia&#39;s multiple dispatch</strong> extensively:</p><ul><li>The <em>Hessian approximation</em> type controls how <code>update_hessian!</code>, <code>apply_hessian!</code>, and <code>solve_newton_direction!</code> behave.</li><li>The <em>subspace</em> type controls <code>build_subspace!</code> and <code>solve_subspace_tr!</code>.</li><li>The <em>TR solver</em> type controls the inner eigenvalue / Cauchy / Brent solver via <code>solve_tr!</code> and <code>solve_tr_2d!</code>.</li><li>The <em>objective</em> type controls whether gradient / Hessian calls hit AD or user functions.</li></ul><p>This means <strong>adding a new Hessian method or subspace is a matter of defining a new struct and implementing the interface methods</strong> — no modification to the main loop required.</p><h2 id="Key-design-decisions"><a class="docs-heading-anchor" href="#Key-design-decisions">Key design decisions</a><a id="Key-design-decisions-1"></a><a class="docs-heading-anchor-permalink" href="#Key-design-decisions" title="Permalink"></a></h2><table><tr><th style="text-align: left">Decision</th><th style="text-align: left">Rationale</th></tr><tr><td style="text-align: left">Single <code>RetroCache</code> struct</td><td style="text-align: left">All working vectors pre-allocated once; passed down the call tree</td></tr><tr><td style="text-align: left"><code>StaticArrays</code> for 2-D subspace</td><td style="text-align: left">Zero allocation for the inner TR solve</td></tr><tr><td style="text-align: left"><code>DifferentiationInterface</code> for AD</td><td style="text-align: left">Backend-agnostic; prep objects cached at construction</td></tr><tr><td style="text-align: left">Separate <code>prep_g</code> and <code>prep_h</code></td><td style="text-align: left">Gradient and Hessian may use different DI code paths</td></tr><tr><td style="text-align: left">Reflections in a loop (not recursive)</td><td style="text-align: left">Bounded stack depth; easy to set a max-reflection limit</td></tr></table></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../api/options/">« Options &amp; Display</a><a class="docs-footer-nextpage" href="../trust-region-dynamics/">Trust-Region Dynamics »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Thursday 12 March 2026 15:08">Thursday 12 March 2026</span>. Using Julia version 1.12.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

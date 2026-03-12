@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Examples · Retro.jl</title><meta name="title" content="Examples · Retro.jl"/><meta property="og:title" content="Examples · Retro.jl"/><meta property="twitter:title" content="Examples · Retro.jl"/><meta name="description" content="Documentation for Retro.jl."/><meta property="og:description" content="Documentation for Retro.jl."/><meta property="twitter:description" content="Documentation for Retro.jl."/><meta property="og:url" content="https://max-de-rooij.github.io/Retro.jl/stable/getting-started/examples/"/><meta property="twitter:url" content="https://max-de-rooij.github.io/Retro.jl/stable/getting-started/examples/"/><link rel="canonical" href="https://max-de-rooij.github.io/Retro.jl/stable/getting-started/examples/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><script src="../../assets/custom.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Retro.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-2" type="checkbox" checked/><label class="tocitem" for="menuitem-2"><span class="docs-label">Getting Started</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../quickstart/">Quick Start</a></li><li class="is-active"><a class="tocitem" href>Examples</a><ul class="internal"><li><a class="tocitem" href="#Rosenbrock-(unconstrained)"><span>Rosenbrock (unconstrained)</span></a></li><li><a class="tocitem" href="#Rosenbrock-(bounded)"><span>Rosenbrock (bounded)</span></a></li><li><a class="tocitem" href="#Quadratic-with-narrow-bounds"><span>Quadratic with narrow bounds</span></a></li><li><a class="tocitem" href="#Exact-Hessian-for-small-problems"><span>Exact Hessian for small problems</span></a></li><li><a class="tocitem" href="#Tuning-convergence-tolerances"><span>Tuning convergence tolerances</span></a></li><li><a class="tocitem" href="#Trigonometric-objective"><span>Trigonometric objective</span></a></li></ul></li></ul></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox"/><label class="tocitem" for="menuitem-3"><span class="docs-label">Algorithm Tutorial</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../guide/overview/">Overview</a></li><li><a class="tocitem" href="../../guide/basic-optimizer/">The Simplest Optimizer</a></li><li><a class="tocitem" href="../../guide/trust-region/">Adding Trust Regions</a></li><li><a class="tocitem" href="../../guide/reflective-bounds/">Handling Bounds</a></li><li><a class="tocitem" href="../../guide/subspaces/">Working in Subspaces</a></li><li><a class="tocitem" href="../../guide/hessian-approximations/">Hessian Approximations</a></li><li><a class="tocitem" href="../../guide/robustness/">Robustness &amp; Fallbacks</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">How-To Guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/bounded-problems/">Bounded Problems</a></li><li><a class="tocitem" href="../../howto/autodiff/">Automatic Differentiation</a></li><li><a class="tocitem" href="../../howto/large-scale/">Large-Scale Problems</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API Reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../api/problems/">Problems &amp; Results</a></li><li><a class="tocitem" href="../../api/objectives/">Objective Functions</a></li><li><a class="tocitem" href="../../api/hessians/">Hessian Methods</a></li><li><a class="tocitem" href="../../api/subspaces/">Subspace Methods</a></li><li><a class="tocitem" href="../../api/solvers/">TR Solvers</a></li><li><a class="tocitem" href="../../api/bounds/">Bounds &amp; Reflection</a></li><li><a class="tocitem" href="../../api/options/">Options &amp; Display</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">Internals</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../internals/architecture/">Architecture</a></li><li><a class="tocitem" href="../../internals/trust-region-dynamics/">Trust-Region Dynamics</a></li><li><a class="tocitem" href="../../internals/cache-design/">Cache &amp; Allocation Design</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Getting Started</a></li><li class="is-active"><a href>Examples</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Examples</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/max-de-rooij/Retro.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/max-de-rooij/Retro.jl/blob/main/docs/src/getting-started/examples.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Examples"><a class="docs-heading-anchor" href="#Examples">Examples</a><a id="Examples-1"></a><a class="docs-heading-anchor-permalink" href="#Examples" title="Permalink"></a></h1><p>A collection of complete, runnable problems.</p><h2 id="Rosenbrock-(unconstrained)"><a class="docs-heading-anchor" href="#Rosenbrock-(unconstrained)">Rosenbrock (unconstrained)</a><a id="Rosenbrock-(unconstrained)-1"></a><a class="docs-heading-anchor-permalink" href="#Rosenbrock-(unconstrained)" title="Permalink"></a></h2><p>The classic banana-shaped valley.  The minimum is at <span>$(1, 1)$</span> with <span>$f = 0$</span>.</p><pre><code class="language-julia hljs">using Retro, ForwardDiff
+
+rosenbrock(x) = 100*(x[2] - x[1]^2)^2 + (1 - x[1])^2
+
+prob   = RetroProblem(rosenbrock, [-1.2, 1.0], AutoForwardDiff())
+result = optimize(prob; display = Iteration())
+
+@assert is_successful(result)
+@assert result.fx &lt; 1e-10</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Iter   f(x)         ||g||        Δ            ρ            Status
+----------------------------------------------------------------------
+0      2.420000e+01 2.328677e+02 1.000000e+00 0.0000       Initial
+1      2.420000e+01 2.328677e+02 2.500000e-01 -0.6332      Rejected
+2      6.321495e+00 6.471981e+01 2.500000e-01 0.3073       Accepted
+3      3.685136e+00 2.345922e+00 5.000000e-01 0.8262       Accepted
+4      3.313024e+00 2.594067e+01 5.000000e-01 0.4128       Accepted
+5      2.838517e+00 2.601316e+01 5.000000e-01 0.4959       Accepted
+6      2.838517e+00 2.601316e+01 1.250000e-01 -1.5116      Rejected
+7      2.018627e+00 1.189224e+01 1.250000e-01 0.3365       Accepted
+8      1.519271e+00 2.861394e+00 2.500000e-01 1.0690       Accepted
+9      1.445345e+00 1.017989e+01 2.500000e-01 0.5229       Accepted
+10     1.306137e+00 4.620038e+00 2.500000e-01 1.2130       Accepted
+11     1.148998e+00 2.785608e+00 2.500000e-01 1.7237       Accepted
+12     1.148998e+00 2.785608e+00 6.250000e-02 -0.1613      Rejected
+13     1.018729e+00 2.462943e+00 1.250000e-01 1.0873       Accepted
+14     8.268127e-01 4.485067e+00 2.500000e-01 0.9218       Accepted
+15     7.159720e-01 9.298259e+00 2.500000e-01 0.7695       Accepted
+16     4.987556e-01 2.119807e+00 2.500000e-01 0.9643       Accepted
+17     3.711586e-01 3.128437e+00 2.500000e-01 1.5486       Accepted
+18     3.711586e-01 3.128437e+00 6.250000e-02 0.0082       Rejected
+19     3.228008e-01 3.837907e+00 1.250000e-01 1.2305       Accepted
+20     2.146101e-01 8.496658e-01 2.500000e-01 1.0986       Accepted
+21     2.146101e-01 8.496658e-01 6.250000e-02 -1.5263      Rejected
+22     1.829336e-01 2.306318e+00 1.250000e-01 0.8440       Accepted
+23     1.481714e-01 5.819719e+00 2.500000e-01 0.9592       Accepted
+24     1.043449e-01 2.755051e+00 2.500000e-01 1.5606       Accepted
+25     6.365518e-02 4.525191e+00 2.500000e-01 1.2104       Accepted
+26     3.248330e-02 8.888048e-01 2.500000e-01 1.0918       Accepted
+27     2.480727e-02 5.444542e+00 2.500000e-01 0.4229       Accepted
+28     1.475454e-02 1.663658e-01 2.500000e-01 0.6141       Accepted
+29     9.227884e-03 4.359357e-01 2.500000e-01 1.7264       Accepted
+30     9.227884e-03 4.359357e-01 6.250000e-02 0.2075       Rejected
+31     4.883017e-03 1.015353e+00 1.250000e-01 0.9769       Accepted
+32     2.057968e-03 1.523703e+00 1.250000e-01 1.1286       Accepted
+33     4.388562e-04 3.078946e-01 1.250000e-01 1.2802       Accepted
+34     4.083776e-05 1.533981e-01 1.250000e-01 1.2279       Accepted
+35     1.364930e-06 1.607563e-02 1.250000e-01 1.1527       Accepted
+36     1.836549e-08 6.060553e-03 1.250000e-01 1.0239       Accepted
+37     1.526982e-09 1.701255e-03 1.250000e-01 0.7177       Accepted
+38     1.896636e-16 5.304281e-08 1.250000e-01 1.0000       Accepted
+
+Optimization completed:
+  Final objective value: 1.896636e-16
+  Final gradient norm:   5.304281e-08
+  Iterations:            39
+  Function evaluations:  71
+  Gradient evaluations:  71
+  Termination reason:    gtol</code></pre><h2 id="Rosenbrock-(bounded)"><a class="docs-heading-anchor" href="#Rosenbrock-(bounded)">Rosenbrock (bounded)</a><a id="Rosenbrock-(bounded)-1"></a><a class="docs-heading-anchor-permalink" href="#Rosenbrock-(bounded)" title="Permalink"></a></h2><p>Force the solution into a box.</p><pre><code class="language-julia hljs">prob = RetroProblem(rosenbrock, [-1.2, 1.0], AutoForwardDiff();
+                    lb = [-2.0, -2.0], ub = [2.0, 2.0])
+result = optimize(prob)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">RetroResult{Float64, Vector{Float64}}:
+  Final objective value: 1.8966363751127637e-16
+  Final gradient norm:   5.30428057190871e-8
+  Iterations:            39
+  Function evaluations:  71
+  Gradient evaluations:  71
+  Hessian evaluations:   0
+  Termination reason:    gtol
+</code></pre><h2 id="Quadratic-with-narrow-bounds"><a class="docs-heading-anchor" href="#Quadratic-with-narrow-bounds">Quadratic with narrow bounds</a><a id="Quadratic-with-narrow-bounds-1"></a><a class="docs-heading-anchor-permalink" href="#Quadratic-with-narrow-bounds" title="Permalink"></a></h2><p>A simple quadratic where the solution is near a boundary.</p><pre><code class="language-julia hljs">f(x) = sum(abs2, x .- [1.0, 2.0, 3.0])
+
+prob = RetroProblem(f, zeros(3), AutoForwardDiff();
+                    lb = [0.5, 0.5, 0.5], ub = [1.5, 1.5, 1.5])
+result = optimize(prob)
+
+# Solution should be at [1.0, 1.5, 1.5] — clamped by upper bounds</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">RetroResult{Float64, Vector{Float64}}:
+  Final objective value: 2.9952164392260188
+  Final gradient norm:   3.4613387232260404
+  Iterations:            29
+  Function evaluations:  33
+  Gradient evaluations:  33
+  Hessian evaluations:   0
+  Termination reason:    ftol
+</code></pre><h2 id="Exact-Hessian-for-small-problems"><a class="docs-heading-anchor" href="#Exact-Hessian-for-small-problems">Exact Hessian for small problems</a><a id="Exact-Hessian-for-small-problems-1"></a><a class="docs-heading-anchor-permalink" href="#Exact-Hessian-for-small-problems" title="Permalink"></a></h2><pre><code class="language-julia hljs">prob = RetroProblem(rosenbrock, [-1.2, 1.0], AutoForwardDiff())
+result = optimize(prob;
+    hessian_approximation = ExactHessian(),
+    subspace = TwoDimSubspace(),
+    display  = Iteration())</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">RetroResult{Float64, Vector{Float64}}:
+  Final objective value: 3.7455795432867295e-22
+  Final gradient norm:   3.382017423206331e-10
+  Iterations:            28
+  Function evaluations:  51
+  Gradient evaluations:  24
+  Hessian evaluations:   23
+  Termination reason:    gtol
+</code></pre><h2 id="Tuning-convergence-tolerances"><a class="docs-heading-anchor" href="#Tuning-convergence-tolerances">Tuning convergence tolerances</a><a id="Tuning-convergence-tolerances-1"></a><a class="docs-heading-anchor-permalink" href="#Tuning-convergence-tolerances" title="Permalink"></a></h2><pre><code class="language-julia hljs">opts = RetroOptions(
+    gtol_a = 1e-10,          # tight gradient tolerance
+    ftol_a = 1e-14,          # tight function tolerance
+    initial_tr_radius = 0.1, # conservative initial radius
+    max_tr_radius = 100.0,
+)
+
+result = optimize(prob; options = opts, maxiter = 5000)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">RetroResult{Float64, Vector{Float64}}:
+  Final objective value: 5.3149840288005736e-21
+  Final gradient norm:   2.4665260431150947e-9
+  Iterations:            37
+  Function evaluations:  69
+  Gradient evaluations:  69
+  Hessian evaluations:   0
+  Termination reason:    ftol
+</code></pre><h2 id="Trigonometric-objective"><a class="docs-heading-anchor" href="#Trigonometric-objective">Trigonometric objective</a><a id="Trigonometric-objective-1"></a><a class="docs-heading-anchor-permalink" href="#Trigonometric-objective" title="Permalink"></a></h2><pre><code class="language-julia hljs">trig(x) = sin(x[1])^2 + cos(x[2])^2 + x[1]*x[2]
+
+prob = RetroProblem(trig, [1.0, -1.0], AutoForwardDiff();
+                    lb = [-π, -π], ub = [π, π])
+result = optimize(prob; display = Final())</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">RetroResult{Float64, Vector{Float64}}:
+  Final objective value: -7.599924457583187
+  Final gradient norm:   4.712443078911963
+  Iterations:            1000
+  Function evaluations:  1987
+  Gradient evaluations:  1987
+  Hessian evaluations:   0
+  Termination reason:    maxiter
+</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../quickstart/">« Quick Start</a><a class="docs-footer-nextpage" href="../../guide/overview/">Overview »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Thursday 12 March 2026 15:08">Thursday 12 March 2026</span>. Using Julia version 1.12.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
