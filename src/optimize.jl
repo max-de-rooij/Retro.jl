@@ -134,6 +134,7 @@ function optimize(
     converged = false
     termination_reason = :maxiter
     consecutive_rejections = 0
+    f_change = zero(ET)               # absolute function change from last accepted step
     
     display_iteration(display, 0, f_current, g_norm, Delta, 0.0, "Initial")
     update_progress!(progress, 0, f_current, g_norm, "Starting")
@@ -141,7 +142,7 @@ function optimize(
     # Main iteration loop
     for k in 1:maxiter
         # Check convergence
-        converged, termination_reason = check_convergence(cache.g, cache.p, zero(ET), options)
+        converged, termination_reason = check_convergence(cache.g, cache.p, f_change, options)
         
         if converged
             return imdone(cache, x, progress, display, k, f_current, termination_reason)
@@ -180,9 +181,11 @@ function optimize(
             # Step acceptance
             if accept_step(rho, options.mu)
                 # Accept step — combined evaluation saves a forward pass
+                f_prev = f_current
                 copy!(x, cache.x_trial)
                 f_current = value_and_gradient!(cache.g, cache, prob.objective, x)
                 g_norm = norm(cache.g)
+                f_change = abs(f_prev - f_current)
                 
                 consecutive_rejections = 0
                 status = "Accepted"
@@ -192,7 +195,7 @@ function optimize(
                 consecutive_rejections += 1
                 status = "Rejected"
                 
-                if consecutive_rejections > 10
+                if consecutive_rejections > 50
                     termination_reason = :stagnation
                     return imdone(cache, x, progress, display, k, f_current, termination_reason)
                 end
