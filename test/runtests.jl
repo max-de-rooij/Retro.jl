@@ -1,24 +1,30 @@
-using Retro, Test, ForwardDiff
+using Retro
+using Test
+using ForwardDiff
+using LinearAlgebra
+using Random
 
-# include("sir_model.jl")
+Random.seed!(1234)
 
-@testset "Boilerplate Tests" begin
-    include("boilerplate.jl")
-end
+@testset "Retro.jl Tests" begin
+    @testset "Boilerplate Tests" begin
+        include("boilerplate.jl")
+    end
 
-@testset "Error Call Tests" begin
-    include("error_calls.jl")
-end
+    @testset "Error Call Tests" begin
+        include("error_calls.jl")
+    end
 
-@testset "Differentiation Interface Tests" begin
-    include("differentiation.jl")
-end
+    @testset "Differentiation Interface Tests" begin
+        include("differentiation.jl")
+    end
 
-@testset "Rosenbrock Problem" begin
-    include("rosenbrock.jl")
-end
+    @testset "Rosenbrock Problem" begin
+        include("rosenbrock.jl")
+    end
 
-@testset "Global Optimization Tests" begin
-    include("global.jl")
+    @testset "Challenging Optimization Problems" begin
+        include("challenging_problems.jl")
+    end
 end
 

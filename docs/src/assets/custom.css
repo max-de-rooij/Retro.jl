@@ -1,0 +1,991 @@
+/* ══════════════════════════════════════════════════════════════════════
+   Retro.jl docs — retro theme
+   ══════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=IBM+Plex+Mono:wght@400;700&display=swap');
+
+:root {
+    --retro-bg:        #1a1a2e;
+    --retro-surface:   #16213e;
+    --retro-panel:     #0f3460;
+    --retro-accent:    #e94560;
+    --retro-mint:      #53d8a8;
+    --retro-gold:      #f5c542;
+    --retro-pink:      #ff6b9d;
+    --retro-text:      #e0e0e0;
+    --retro-text-dim:  #8a8a9a;
+    --retro-mono:      'IBM Plex Mono', 'Courier New', monospace;
+    --retro-display:   'Press Start 2P', monospace;
+    --retro-body:      'VT323', monospace;
+}
+
+/* ── Global overrides ──────────────────────────────────────────────── */
+
+html {
+    background: var(--retro-bg) !important;
+}
+
+body {
+    font-family: var(--retro-body) !important;
+    font-size: 18px;
+    color: var(--retro-text) !important;
+    background: var(--retro-bg) !important;
+}
+
+/* ── Hide Documenter's default sidebar & navbar ───────────────────── */
+
+.docs-sidebar {
+    position: fixed !important;
+    left: -320px !important;
+    top: 0 !important;
+    width: 300px !important;
+    height: 100vh !important;
+    z-index: 1100 !important;
+    transition: left 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+    background: var(--retro-surface) !important;
+    border-right: 3px solid var(--retro-accent) !important;
+    overflow-y: auto !important;
+    display: block !important;
+    padding-top: 20px !important;
+}
+
+.docs-sidebar.retro-open {
+    left: 0 !important;
+}
+
+/* Style sidebar internals */
+.docs-sidebar .docs-package-name {
+    background: var(--retro-panel) !important;
+    color: var(--retro-accent) !important;
+    font-family: var(--retro-display) !important;
+    font-size: 10px !important;
+}
+
+.docs-sidebar .docs-menu a {
+    color: var(--retro-text) !important;
+    font-family: var(--retro-body) !important;
+    font-size: 17px !important;
+}
+
+.docs-sidebar .docs-menu a:hover,
+.docs-sidebar .docs-menu .is-active > a {
+    color: var(--retro-mint) !important;
+    background: rgba(83, 216, 168, 0.08) !important;
+}
+
+.docs-sidebar .docs-menu li.is-active > a {
+    border-left: 3px solid var(--retro-mint) !important;
+}
+
+/* Hide the built-in hamburger */
+#documenter-sidebar-button {
+    display: none !important;
+}
+
+/* ── The folder tab ───────────────────────────────────────────────── */
+
+#retro-folder-tab {
+    position: fixed;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    z-index: 1000;
+    cursor: pointer;
+    transition: left 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+    /* folder shape */
+    width: 44px;
+    height: 140px;
+    background: var(--retro-surface);
+    border: 3px solid var(--retro-accent);
+    border-left: none;
+    border-radius: 0 12px 12px 0;
+    box-shadow: 4px 0 16px rgba(233, 69, 96, 0.25);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#retro-folder-tab:hover {
+    background: var(--retro-panel);
+    box-shadow: 4px 0 24px rgba(233, 69, 96, 0.45);
+}
+
+#retro-folder-tab.open {
+    left: 300px;
+}
+
+#retro-folder-tab .tab-label {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-family: var(--retro-display);
+    font-size: 9px;
+    color: var(--retro-accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    user-select: none;
+}
+
+/* little "folder" notch at top */
+#retro-folder-tab::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: 0;
+    width: 26px;
+    height: 14px;
+    background: var(--retro-accent);
+    border-radius: 0 6px 0 0;
+}
+
+/* ── Sidebar overlay (click to close) ─────────────────────────────── */
+
+#retro-sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1050;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+#retro-sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* ── Main content area ─────────────────────────────────────────────── */
+
+.docs-main {
+    margin-left: 0 !important;
+    max-width: 900px !important;
+    margin: 0 auto !important;
+    padding: 40px 30px !important;
+    padding-top: 68px !important;
+    background: transparent !important;
+}
+
+#documenter .docs-main > article {
+    background: transparent !important;
+    color: var(--retro-text) !important;
+}
+
+/* Headings */
+#documenter .docs-main h1 {
+    font-family: var(--retro-display) !important;
+    font-size: 28px !important;
+    color: var(--retro-accent) !important;
+    line-height: 1.6 !important;
+    margin-bottom: 30px !important;
+    margin-top: 10px !important;
+}
+
+#documenter .docs-main h2 {
+    font-family: var(--retro-display) !important;
+    font-size: 16px !important;
+    color: var(--retro-mint) !important;
+    line-height: 1.6 !important;
+    margin-top: 40px !important;
+    border-bottom: 2px solid var(--retro-panel);
+    padding-bottom: 8px;
+}
+
+#documenter .docs-main h3 {
+    font-family: var(--retro-display) !important;
+    font-size: 12px !important;
+    color: var(--retro-gold) !important;
+    line-height: 1.6 !important;
+}
+
+/* Bold / strong text */
+#documenter .docs-main strong,
+#documenter .docs-main b,
+#documenter table strong,
+#documenter table b {
+    color: var(--retro-mint) !important;
+}
+
+#documenter .docs-main code,
+#documenter table code {
+    color: var(--retro-pink) !important;
+}
+
+/* Links */
+#documenter a {
+    color: var(--retro-mint) !important;
+}
+#documenter a:hover {
+    color: var(--retro-gold) !important;
+}
+
+/* Code blocks */
+#documenter .docs-main pre {
+    background: #0d1117 !important;
+    border: 2px solid var(--retro-panel) !important;
+    border-radius: 6px !important;
+    font-family: var(--retro-mono) !important;
+    font-size: 14px !important;
+}
+
+#documenter .docs-main code {
+    font-family: var(--retro-mono) !important;
+    font-size: 15px !important;
+}
+
+/* Brighten syntax inside code blocks */
+#documenter .docs-main pre code {
+    color: #e6edf3 !important;
+}
+
+#documenter .highlight .n,
+#documenter .highlight .nf,
+#documenter .highlight .nb {
+    color: #7ee8fa !important;
+}
+
+#documenter .highlight .k,
+#documenter .highlight .kd,
+#documenter .highlight .kn {
+    color: #ff7eb6 !important;
+}
+
+#documenter .highlight .s,
+#documenter .highlight .s1,
+#documenter .highlight .s2 {
+    color: #a5d6ff !important;
+}
+
+#documenter .highlight .c,
+#documenter .highlight .cm,
+#documenter .highlight .c1 {
+    color: #8b949e !important;
+}
+
+#documenter .highlight .mi,
+#documenter .highlight .mf,
+#documenter .highlight .kt {
+    color: var(--retro-gold) !important;
+}
+
+#documenter .highlight .o,
+#documenter .highlight .p {
+    color: #e0e0e0 !important;
+}
+
+#documenter .docs-main p > code,
+#documenter .docs-main li > code {
+    background: rgba(233, 69, 96, 0.12) !important;
+    color: var(--retro-pink) !important;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+/* Tables */
+#documenter table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    font-family: var(--retro-body) !important;
+}
+
+#documenter table th {
+    background: var(--retro-panel) !important;
+    color: var(--retro-mint) !important;
+    font-family: var(--retro-display) !important;
+    font-size: 10px !important;
+    letter-spacing: 1px;
+    padding: 12px !important;
+    border-bottom: 2px solid var(--retro-accent) !important;
+}
+
+#documenter table td {
+    padding: 10px 12px !important;
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+    color: var(--retro-text) !important;
+}
+
+#documenter table tr:hover td {
+    background: rgba(83, 216, 168, 0.04) !important;
+}
+
+/* Footer */
+.docs-footer {
+    background: transparent !important;
+    border-top: 2px solid var(--retro-panel) !important;
+    color: var(--retro-text-dim) !important;
+}
+
+.docs-footer a {
+    color: var(--retro-mint) !important;
+}
+
+/* Navbar */
+.docs-navbar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    z-index: 950 !important;
+    background: var(--retro-surface) !important;
+    border-bottom: 2px solid var(--retro-panel) !important;
+    color: var(--retro-text) !important;
+    padding: 0 20px !important;
+    height: 48px !important;
+    display: flex !important;
+    align-items: center !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Home link injected by JS */
+#retro-home-link {
+    font-family: var(--retro-display);
+    font-size: 10px;
+    color: var(--retro-accent) !important;
+    text-decoration: none !important;
+    margin-right: 0;
+    padding-right: 24px;
+    white-space: nowrap;
+    letter-spacing: 1px;
+    transition: color 0.2s;
+    flex-shrink: 0;
+    border-right: 2px solid var(--retro-panel);
+}
+
+#retro-home-link:hover {
+    color: var(--retro-gold) !important;
+}
+
+.docs-navbar .breadcrumb {
+    flex: 1;
+    padding-left: 24px !important;
+}
+
+.docs-navbar .breadcrumb a {
+    color: var(--retro-text) !important;
+}
+
+.docs-navbar .docs-right {
+    margin-left: auto;
+}
+
+/* Hide Documenter's default right-side buttons (settings, edit, collapse) */
+#documenter-settings-button,
+#documenter-article-toggle-button,
+.docs-navbar .docs-right > a[title="Edit source on GitHub"] {
+    display: none !important;
+}
+
+/* ── Custom right-side controls ────────────────────────────────────── */
+
+#retro-navbar-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-left: auto;
+}
+
+#retro-github-link {
+    color: var(--retro-text) !important;
+    text-decoration: none !important;
+    font-family: var(--retro-mono);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.2s;
+    opacity: 0.8;
+}
+
+#retro-github-link:hover {
+    color: var(--retro-mint) !important;
+    opacity: 1;
+}
+
+#retro-github-link svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+/* Dark / light toggle — retro I/O rocker switch */
+#retro-theme-toggle {
+    position: relative;
+    width: 32px;
+    height: 46px;
+    background: #1a1a2a;
+    border: 2px solid #666;
+    border-radius: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow: hidden;
+    box-shadow: inset 0 0 6px rgba(0,0,0,0.7), 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* The rocker face */
+#retro-theme-toggle .rocker {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    right: 2px;
+    bottom: 2px;
+    border-radius: 3px;
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-style: preserve-3d;
+    perspective: 80px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Top half (I) — pressed in dark mode, illuminated red */
+#retro-theme-toggle .rocker-top {
+    flex: 1;
+    background: linear-gradient(to bottom, rgba(233, 69, 96, 0.85), rgba(180, 40, 65, 0.80));
+    border-radius: 3px 3px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--retro-mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1;
+    border-bottom: 1px solid rgba(140, 30, 50, 0.6);
+    transform: scaleY(0.85) translateY(-1px);
+    transform-origin: bottom center;
+    transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: inset 0 0 12px rgba(233, 69, 96, 0.4);
+}
+
+/* Bottom half (O) — raised in dark mode */
+#retro-theme-toggle .rocker-bottom {
+    flex: 1;
+    background: linear-gradient(to bottom, rgba(233, 69, 96, 0.55), rgba(180, 40, 65, 0.45));
+    border-radius: 0 0 3px 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--retro-mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1;
+    border-top: 1px solid rgba(255, 120, 140, 0.3);
+    transform: scaleY(1) translateY(1px);
+    transform-origin: top center;
+    transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.3);
+}
+
+/* Light mode: flip — O pressed, I raised, no glow */
+#retro-theme-toggle.light .rocker-top {
+    background: linear-gradient(to bottom, rgba(233, 69, 96, 0.45), rgba(180, 40, 65, 0.35));
+    transform: scaleY(1) translateY(-1px);
+    box-shadow: 0 -2px 3px rgba(0,0,0,0.2);
+    color: rgba(255, 255, 255, 0.5);
+}
+
+#retro-theme-toggle.light .rocker-bottom {
+    background: linear-gradient(to bottom, rgba(233, 69, 96, 0.30), rgba(140, 30, 50, 0.25));
+    transform: scaleY(0.85) translateY(1px);
+    box-shadow: none;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* Indicator light */
+#retro-theme-toggle .toggle-light {
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--retro-accent);
+    box-shadow: 0 0 4px var(--retro-accent), 0 0 10px var(--retro-accent);
+    transition: background 0.3s, box-shadow 0.3s;
+    z-index: 2;
+    pointer-events: none;
+}
+
+#retro-theme-toggle.light .toggle-light {
+    background: #444;
+    box-shadow: none;
+}
+
+/* ── Light mode overrides ──────────────────────────────────────────── */
+
+body.retro-light {
+    --retro-bg:        #f0ece3;
+    --retro-surface:   #e4dfd5;
+    --retro-panel:     #d4cfc5;
+    --retro-text:      #2a2a2a;
+    --retro-text-dim:  #6a6a6a;
+}
+
+body.retro-light::after {
+    background: none !important;
+}
+
+body.retro-light #documenter .docs-main pre {
+    background: #1e1e2e !important;
+}
+
+body.retro-light #documenter .docs-main p > code,
+body.retro-light #documenter .docs-main li > code {
+    background: rgba(233, 69, 96, 0.10) !important;
+}
+
+/* ── Admonitions — illuminated neon glow boxes ─────────────────────── */
+.admonition {
+    position: relative;
+    background: rgba(22, 33, 62, 0.85) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    border-left: none !important;
+    border-radius: 6px !important;
+    padding: 0 !important;
+    margin: 1.5em 0 !important;
+    overflow: hidden;
+}
+
+/* Glowing left rail */
+.admonition::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 4px;
+    height: 100%;
+    border-radius: 6px 0 0 6px;
+}
+
+/* ── Info (is-info) — mint / cyan glow ── */
+.admonition.is-info {
+    border-color: rgba(83, 216, 168, 0.15) !important;
+    box-shadow:
+        0 0 12px rgba(83, 216, 168, 0.12),
+        0 0 30px rgba(83, 216, 168, 0.06),
+        inset 0 0 20px rgba(83, 216, 168, 0.04);
+}
+.admonition.is-info::before {
+    background: var(--retro-mint);
+    box-shadow: 0 0 8px var(--retro-mint), 0 0 20px rgba(83, 216, 168, 0.4);
+}
+.admonition.is-info > .admonition-title {
+    background: linear-gradient(90deg, rgba(83, 216, 168, 0.18) 0%, rgba(83, 216, 168, 0.03) 100%) !important;
+    color: var(--retro-mint) !important;
+    border-bottom: 1px solid rgba(83, 216, 168, 0.12) !important;
+}
+
+/* ── Warning (is-warning) — amber / gold glow ── */
+.admonition.is-warning {
+    border-color: rgba(245, 197, 66, 0.15) !important;
+    box-shadow:
+        0 0 12px rgba(245, 197, 66, 0.12),
+        0 0 30px rgba(245, 197, 66, 0.06),
+        inset 0 0 20px rgba(245, 197, 66, 0.04);
+}
+.admonition.is-warning::before {
+    background: var(--retro-gold);
+    box-shadow: 0 0 8px var(--retro-gold), 0 0 20px rgba(245, 197, 66, 0.4);
+}
+.admonition.is-warning > .admonition-title {
+    background: linear-gradient(90deg, rgba(245, 197, 66, 0.18) 0%, rgba(245, 197, 66, 0.03) 100%) !important;
+    color: var(--retro-gold) !important;
+    border-bottom: 1px solid rgba(245, 197, 66, 0.12) !important;
+}
+
+/* ── Danger (is-danger) — red / accent glow ── */
+.admonition.is-danger {
+    border-color: rgba(233, 69, 96, 0.15) !important;
+    box-shadow:
+        0 0 12px rgba(233, 69, 96, 0.12),
+        0 0 30px rgba(233, 69, 96, 0.06),
+        inset 0 0 20px rgba(233, 69, 96, 0.04);
+}
+.admonition.is-danger::before {
+    background: var(--retro-accent);
+    box-shadow: 0 0 8px var(--retro-accent), 0 0 20px rgba(233, 69, 96, 0.4);
+}
+.admonition.is-danger > .admonition-title {
+    background: linear-gradient(90deg, rgba(233, 69, 96, 0.18) 0%, rgba(233, 69, 96, 0.03) 100%) !important;
+    color: var(--retro-accent) !important;
+    border-bottom: 1px solid rgba(233, 69, 96, 0.12) !important;
+}
+
+/* ── Default / other admonitions — pink glow ── */
+.admonition:not(.is-info):not(.is-warning):not(.is-danger) {
+    border-color: rgba(255, 107, 157, 0.15) !important;
+    box-shadow:
+        0 0 12px rgba(255, 107, 157, 0.10),
+        0 0 30px rgba(255, 107, 157, 0.05),
+        inset 0 0 20px rgba(255, 107, 157, 0.03);
+}
+.admonition:not(.is-info):not(.is-warning):not(.is-danger)::before {
+    background: var(--retro-pink);
+    box-shadow: 0 0 8px var(--retro-pink), 0 0 20px rgba(255, 107, 157, 0.4);
+}
+.admonition:not(.is-info):not(.is-warning):not(.is-danger) > .admonition-title {
+    background: linear-gradient(90deg, rgba(255, 107, 157, 0.18) 0%, rgba(255, 107, 157, 0.03) 100%) !important;
+    color: var(--retro-pink) !important;
+    border-bottom: 1px solid rgba(255, 107, 157, 0.12) !important;
+}
+
+/* Title bar shared styles */
+.admonition > .admonition-title {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 10px 16px 10px 22px !important;
+    margin: 0 !important;
+    font-family: var(--retro-display) !important;
+    font-size: 10px !important;
+    letter-spacing: 0.5px !important;
+    text-transform: uppercase !important;
+}
+
+/* Body text */
+.admonition > .admonition-body,
+.admonition > :not(.admonition-title) {
+    padding: 12px 16px 14px 22px !important;
+    color: var(--retro-text) !important;
+    font-family: var(--retro-body) !important;
+    font-size: 17px !important;
+    line-height: 1.6 !important;
+}
+
+/* ── Retro icon — pixel art drawn with CSS ── */
+.retro-admonition-icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    image-rendering: pixelated;
+    position: relative;
+}
+
+/* Info icon: a retro terminal cursor block */
+.admonition.is-info .retro-admonition-icon {
+    background:
+        /* outer box */
+        linear-gradient(var(--retro-mint), var(--retro-mint)) 0 0   / 16px 2px no-repeat,
+        linear-gradient(var(--retro-mint), var(--retro-mint)) 0 14px / 16px 2px no-repeat,
+        linear-gradient(var(--retro-mint), var(--retro-mint)) 0 0   / 2px 16px no-repeat,
+        linear-gradient(var(--retro-mint), var(--retro-mint)) 14px 0 / 2px 16px no-repeat,
+        /* "i" dot */
+        linear-gradient(var(--retro-mint), var(--retro-mint)) 7px 3px / 2px 2px no-repeat,
+        /* "i" stem */
+        linear-gradient(var(--retro-mint), var(--retro-mint)) 7px 7px / 2px 6px no-repeat;
+    filter: drop-shadow(0 0 3px var(--retro-mint));
+}
+
+/* Warning icon: a retro pixel triangle with "!" */
+.admonition.is-warning .retro-admonition-icon {
+    background:
+        /* triangle top */
+        linear-gradient(var(--retro-gold), var(--retro-gold)) 7px 0   / 2px 2px no-repeat,
+        linear-gradient(var(--retro-gold), var(--retro-gold)) 5px 2px / 6px 2px no-repeat,
+        linear-gradient(var(--retro-gold), var(--retro-gold)) 3px 4px / 10px 2px no-repeat,
+        linear-gradient(var(--retro-gold), var(--retro-gold)) 1px 6px / 14px 2px no-repeat,
+        linear-gradient(var(--retro-gold), var(--retro-gold)) 0 8px / 16px 2px no-repeat,
+        /* base */
+        linear-gradient(var(--retro-gold), var(--retro-gold)) 0 10px / 16px 2px no-repeat,
+        /* floor */
+        linear-gradient(var(--retro-gold), var(--retro-gold)) 0 14px / 16px 2px no-repeat,
+        /* "!" top (dark on gold) */
+        linear-gradient(var(--retro-bg), var(--retro-bg)) 7px 4px / 2px 4px no-repeat,
+        /* "!" dot */
+        linear-gradient(var(--retro-bg), var(--retro-bg)) 7px 10px / 2px 2px no-repeat;
+    filter: drop-shadow(0 0 3px var(--retro-gold));
+}
+
+/* Danger icon: a retro pixel skull / X */
+.admonition.is-danger .retro-admonition-icon {
+    background:
+        /* outer circle-ish shape */
+        linear-gradient(var(--retro-accent), var(--retro-accent)) 4px 0   / 8px 2px no-repeat,
+        linear-gradient(var(--retro-accent), var(--retro-accent)) 2px 2px / 12px 2px no-repeat,
+        linear-gradient(var(--retro-accent), var(--retro-accent)) 0 4px   / 16px 2px no-repeat,
+        linear-gradient(var(--retro-accent), var(--retro-accent)) 0 6px   / 16px 2px no-repeat,
+        linear-gradient(var(--retro-accent), var(--retro-accent)) 2px 8px / 12px 2px no-repeat,
+        linear-gradient(var(--retro-accent), var(--retro-accent)) 4px 10px / 8px 2px no-repeat,
+        /* X cross */
+        linear-gradient(var(--retro-bg), var(--retro-bg)) 4px 4px / 2px 2px no-repeat,
+        linear-gradient(var(--retro-bg), var(--retro-bg)) 10px 4px / 2px 2px no-repeat,
+        linear-gradient(var(--retro-bg), var(--retro-bg)) 6px 6px / 4px 2px no-repeat,
+        linear-gradient(var(--retro-bg), var(--retro-bg)) 4px 8px / 2px 2px no-repeat,
+        linear-gradient(var(--retro-bg), var(--retro-bg)) 10px 8px / 2px 2px no-repeat,
+        /* bottom teeth */
+        linear-gradient(var(--retro-accent), var(--retro-accent)) 2px 12px / 2px 2px no-repeat,
+        linear-gradient(var(--retro-accent), var(--retro-accent)) 6px 12px / 2px 2px no-repeat,
+        linear-gradient(var(--retro-accent), var(--retro-accent)) 10px 12px/ 2px 2px no-repeat;
+    filter: drop-shadow(0 0 3px var(--retro-accent));
+}
+
+/* Default icon: retro pixel star */
+.admonition:not(.is-info):not(.is-warning):not(.is-danger) .retro-admonition-icon {
+    background:
+        linear-gradient(var(--retro-pink), var(--retro-pink)) 7px 0   / 2px 2px no-repeat,
+        linear-gradient(var(--retro-pink), var(--retro-pink)) 3px 4px / 10px 2px no-repeat,
+        linear-gradient(var(--retro-pink), var(--retro-pink)) 0 6px   / 16px 2px no-repeat,
+        linear-gradient(var(--retro-pink), var(--retro-pink)) 3px 8px / 10px 2px no-repeat,
+        linear-gradient(var(--retro-pink), var(--retro-pink)) 5px 10px / 2px 2px no-repeat,
+        linear-gradient(var(--retro-pink), var(--retro-pink)) 9px 10px / 2px 2px no-repeat,
+        linear-gradient(var(--retro-pink), var(--retro-pink)) 3px 12px / 2px 2px no-repeat,
+        linear-gradient(var(--retro-pink), var(--retro-pink)) 11px 12px/ 2px 2px no-repeat;
+    filter: drop-shadow(0 0 3px var(--retro-pink));
+}
+
+/* ── Light-mode overrides for admonitions ── */
+body.retro-light .admonition {
+    background: rgba(255, 255, 255, 0.92) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+body.retro-light .admonition.is-info {
+    box-shadow:
+        0 0 10px rgba(40, 160, 120, 0.12),
+        0 0 24px rgba(40, 160, 120, 0.06);
+}
+body.retro-light .admonition.is-warning {
+    box-shadow:
+        0 0 10px rgba(200, 155, 20, 0.12),
+        0 0 24px rgba(200, 155, 20, 0.06);
+}
+body.retro-light .admonition.is-danger {
+    box-shadow:
+        0 0 10px rgba(200, 50, 70, 0.12),
+        0 0 24px rgba(200, 50, 70, 0.06);
+}
+body.retro-light .admonition > .admonition-body,
+body.retro-light .admonition > :not(.admonition-title) {
+    color: #2a2a3a !important;
+}
+
+/* CRT scanlines (subtle) */
+body::after {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+    background: repeating-linear-gradient(
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.03) 3px
+    );
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Homepage — "I want to:" cards
+   ══════════════════════════════════════════════════════════════════════ */
+
+.retro-hero {
+    text-align: center;
+    padding: 60px 0 30px;
+}
+
+.retro-hero h1 {
+    font-family: var(--retro-display) !important;
+    font-size: 32px !important;
+    color: var(--retro-accent) !important;
+    margin-bottom: 10px !important;
+}
+
+.retro-hero .tagline {
+    font-family: var(--retro-body);
+    font-size: 22px;
+    color: var(--retro-text-dim);
+    margin-bottom: 10px;
+}
+
+.retro-hero .version-badge {
+    display: inline-block;
+    font-family: var(--retro-mono);
+    font-size: 12px;
+    color: var(--retro-mint);
+    border: 1px solid var(--retro-mint);
+    border-radius: 4px;
+    padding: 3px 10px;
+    margin-top: 6px;
+}
+
+.retro-intro {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 20px 0 40px;
+    text-align: center;
+    font-size: 20px;
+    color: var(--retro-text-dim);
+    line-height: 1.7;
+}
+
+/* "I want to:" heading */
+.retro-iwantto {
+    text-align: center;
+    font-family: var(--retro-display);
+    font-size: 18px;
+    color: var(--retro-gold);
+    margin: 40px 0 30px;
+    letter-spacing: 2px;
+}
+
+/* Card container */
+.retro-cards-container {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    max-width: 750px;
+    margin: 0 auto;
+    padding-bottom: 50px;
+}
+
+/* Individual card */
+.retro-action-card {
+    width: 85%;
+    padding: 32px 36px;
+    border: 3px solid;
+    border-radius: 2px;
+    text-decoration: none !important;
+    display: block;
+    position: relative;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    /* animation setup */
+    opacity: 0;
+    transform: translateX(0);
+}
+
+.retro-action-card:hover {
+    transform: translateY(-4px) !important;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+/* Alternating: left, right, left */
+.retro-action-card.from-left {
+    align-self: flex-start;
+    transform: translateX(-60px);
+}
+
+.retro-action-card.from-right {
+    align-self: flex-end;
+    transform: translateX(60px);
+}
+
+.retro-action-card.retro-visible {
+    opacity: 1;
+    transform: translateX(0);
+    transition: transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                opacity 0.7s ease,
+                box-shadow 0.3s ease;
+}
+
+/* Card 1: Start optimizing — accent red */
+.retro-action-card.card-optimize {
+    background: linear-gradient(135deg, rgba(233, 69, 96, 0.15), rgba(233, 69, 96, 0.05));
+    border-color: var(--retro-accent);
+}
+
+.retro-action-card.card-optimize .card-number {
+    color: var(--retro-accent);
+}
+
+/* Card 2: Learn — mint */
+.retro-action-card.card-learn {
+    background: linear-gradient(135deg, rgba(83, 216, 168, 0.15), rgba(83, 216, 168, 0.05));
+    border-color: var(--retro-mint);
+}
+
+.retro-action-card.card-learn .card-number {
+    color: var(--retro-mint);
+}
+
+/* Card 3: Contribute — gold */
+.retro-action-card.card-contribute {
+    background: linear-gradient(135deg, rgba(245, 197, 66, 0.15), rgba(245, 197, 66, 0.05));
+    border-color: var(--retro-gold);
+}
+
+.retro-action-card.card-contribute .card-number {
+    color: var(--retro-gold);
+}
+
+/* Card internals */
+.retro-action-card .card-number {
+    font-family: var(--retro-display);
+    font-size: 36px;
+    opacity: 0.3;
+    position: absolute;
+    top: 16px;
+    right: 20px;
+}
+
+.retro-action-card .card-title {
+    font-family: var(--retro-display);
+    font-size: 16px;
+    color: #fff;
+    margin: 0 0 12px 0;
+    line-height: 1.5;
+}
+
+.retro-action-card .card-desc {
+    font-family: var(--retro-body);
+    font-size: 19px;
+    color: var(--retro-text-dim);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.retro-action-card .card-arrow {
+    font-family: var(--retro-mono);
+    font-size: 14px;
+    margin-top: 14px;
+    display: inline-block;
+    opacity: 0.6;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.retro-action-card:hover .card-arrow {
+    opacity: 1;
+    transform: translateX(6px);
+}
+
+/* ── Minimal example block on homepage ─────────────────────────────── */
+.retro-example-section {
+    margin-top: 50px;
+    padding-top: 30px;
+    border-top: 2px solid var(--retro-panel);
+}
+
+/* ── Responsive ────────────────────────────────────────────────────── */
+
+@media (max-width: 700px) {
+    .retro-action-card {
+        width: 100% !important;
+    }
+    .retro-action-card.from-left,
+    .retro-action-card.from-right {
+        align-self: center;
+        transform: translateY(30px);
+    }
+    .retro-hero h1 {
+        font-size: 22px !important;
+    }
+    .retro-iwantto {
+        font-size: 14px;
+    }
+    #retro-folder-tab {
+        top: auto;
+        bottom: 20px;
+        width: 36px;
+        height: 110px;
+    }
+}

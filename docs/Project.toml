@@ -1,0 +1,9 @@
+[deps]
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+LiveServer = "16fef848-5104-11e9-1b77-fb7a48bbb589"
+Retro = "84116d00-1ebd-4c04-8261-67462aec1636"
+
+[compat]
+Documenter = "1"

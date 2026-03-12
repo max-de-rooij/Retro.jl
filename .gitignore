@@ -3,3 +3,9 @@ benchmark.txt
 *.png
 .vscode/
 assets/retro_logo.ai
+
+docs/build/
+*ipynb
+
+.DS_Store
+*.DS_Store

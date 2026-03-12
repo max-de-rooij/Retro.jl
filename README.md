@@ -1,9 +1,13 @@
-# Retro.jl
-
-<img src="assets/retro_logo.svg" alt="Retro Logo" width="300"/>
-
 > [!WARNING]
 > The optimizer is still under development, and has not been fully tested, yet. Use with caution.
+
+██████╗ ███████╗████████╗██████╗  ██████╗ 
+██╔══██╗██╔════╝╚══██╔══╝██╔══██╗██╔═══██╗
+██████╔╝█████╗     ██║   ██████╔╝██║   ██║
+██╔══██╗██╔══╝     ██║   ██╔══██╗██║   ██║
+██║  ██║███████╗   ██║   ██║  ██║╚██████╔╝
+╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝ 
+Reflective-bounds Trust Region Optimizer
 
 Retro (REflective-bounds Trust-Region Optimizer): A high-performance Julia package for bound-constrained optimization using trust-region reflective methods.
 
@@ -18,27 +22,16 @@ Retro (REflective-bounds Trust-Region Optimizer): A high-performance Julia packa
 ## Quick Start
 
 ```julia
-using Retro
+using Retro, ForwardDiff
 
-# Simple unconstrained optimization
-f(x) = sum(abs2, x .- [1.0, 2.0])
+# Define a scalar objective f : ℝⁿ → ℝ
+f(x) = (x[1] - 3.0)^2 + (x[2] + 1.0)^2
+
+# Wrap it in a problem: function, initial guess, AD backend
 prob = RetroProblem(f, [0.0, 0.0], AutoForwardDiff())
-result = solve(prob, BFGSUpdate(), TwoDimSubspace())
 
-# Bound-constrained optimization (Rosenbrock)
-rosenbrock(x) = 100*(x[2] - x[1]^2)^2 + (1 - x[1])^2
-prob = RetroProblem(rosenbrock, [-1.2, 1.0], AutoForwardDiff();
-                   lb=[-2.0, -2.0], ub=[2.0, 2.0])
-result = solve(prob, BFGSUpdate(), TwoDimSubspace())
-
-# Least-squares with Gauss-Newton (prob.f must be residual function!)
-residuals(x) = [10*(x[2] - x[1]^2); 1 - x[1]]
-prob = RetroProblem(residuals, [-1.2, 1.0], AutoForwardDiff())
-result = solve(prob, GaussNewtonUpdate(), TwoDimSubspace())
-
-# Hybrid Gauss-Newton with fallback
-hybrid = HybridGaussNewtonUpdate(fallback_update=BFGSUpdate())
-result = solve(prob, hybrid, TwoDimSubspace())
+# Optimize
+result = optimize(prob)
 ```
 
 ## Hessian Strategies
@@ -46,7 +39,6 @@ result = solve(prob, hybrid, TwoDimSubspace())
 - `BFGSUpdate()`: Quasi-Newton BFGS (recommended for general use)
 - `SR1Update()`: Symmetric Rank-1 (good for indefinite problems)
 - `ExactHessian()`: Exact Hessian via AD (expensive but accurate)
-- `GaussNewtonUpdate()`: For least-squares (**requires `prob.f` to be residual function**)
 
 ## Subproblem Solvers
 
@@ -54,23 +46,5 @@ result = solve(prob, hybrid, TwoDimSubspace())
 - `CGSubspace()`: Steihaug-Toint CG (good for large problems)
 - `FullSpace()`: Eigenvalue decomposition (most accurate, expensive)
 
-## Important Notes
-
-### Gauss-Newton Methods
-
-When using `GaussNewtonUpdate()`, **`prob.f` must be the residual function** r(x) that returns a vector, not a scalar objective. The implicit objective being minimized is 0.5*||r(x)||².
-
-```julia
-# ✓ CORRECT: prob.f is the residual function
-residuals(x) = [10*(x[2] - x[1]^2); 1 - x[1]]
-prob = RetroProblem(residuals, x0, AutoForwardDiff())
-solve(prob, GaussNewtonUpdate(), TwoDimSubspace())
-
-# ✗ WRONG: prob.f is a scalar objective
-objective(x) = 100*(x[2] - x[1]^2)^2 + (1 - x[1])^2
-prob = RetroProblem(objective, x0, AutoForwardDiff())
-solve(prob, GaussNewtonUpdate(), TwoDimSubspace())  # This will error!
-```
-
 ## Acknowledgements
-Retro.jl is heavily inspired by the [fides](https://github.com/fides-dev/fides) optimizer in Python and we wish to acknowledge the authors of the fides package for their contributions to the field of trust-region optimization. See the [fides paper](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1010322) for more details.
+Retro.jl is heavily inspired by the [fides](https://github.com/fides-dev/fides) optimizer in Python, as well as the MATLAB `lsqnonlin` optimizer.

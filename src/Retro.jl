@@ -1,92 +1,72 @@
-"""
-    Retro
-
-A high-performance trust-region optimization package for Julia.
-
-Retro implements interior-point trust-region reflective algorithms for bound-constrained
-optimization, with a focus on speed and efficiency for ODE parameter estimation problems.
-
-Key features:
-- Multiple Hessian approximation strategies (BFGS, SR1, Exact)
-- Flexible subproblem solvers (2D subspace, CG, Full space)
-- Automatic differentiation support via DifferentiationInterface
-- Bound constraint handling with reflective boundaries
-- Specialized support for ODE parameter estimation problems
-
-Example:
-```julia
-using Retro
-
-f(x) = sum(abs2, x)
-prob = RetroProblem(f, [1.0, 2.0], AutoForwardDiff())
-result = solve(prob, BFGSUpdate(), TwoDimSubspace())
-```
-
-For ODE parameter estimation:
-```julia
-prob, hess, subprob, opts = setup_ode_optimization(nll, x0, AutoForwardDiff())
-result = solve(prob, hess, subprob; options=opts)
-```
-"""
 module Retro
 
-using LinearAlgebra
-using DifferentiationInterface
-using DifferentiationInterface: Constant
-using Printf
-using QuasiMonteCarlo
-using Random
-using ProgressMeter
-import ForwardDiff
-import BracketingNonlinearSolve as NLS
-
-
-include("types.jl")
-include("bounds.jl")
-include("subproblem.jl")
-include("hessian.jl")
-include("gauss_newton.jl")
-include("solve.jl")
-include("global.jl")
-
-export RetroProblem, RetroOptions
-export BFGSUpdate, SR1Update, ExactHessian, GaussNewtonUpdate
-export TwoDimSubspace, CGSubspace, FullSpace
-export EigenvalueSolver, CauchyPointSolver
-export LatinHypercubeSampling
-export optimize, globaloptimize
-export analyze_result
-
 using Reexport
-@reexport using DifferentiationInterface: AutoForwardDiff, AutoReverseDiff, AutoZygote, AutoMooncake, AutoMooncakeForward, AutoFiniteDiff
+@reexport using DifferentiationInterface
+@reexport using ADTypes
+@reexport using LinearAlgebra
+@reexport using StaticArrays
 
-"""
-    analyze_result(result::RetroResult)
+# Core types and cache must come first
+include("types.jl")
+export AbstractObjectiveFunction, AbstractSubspace, AbstractTRSolver, 
+       AbstractHessianApproximation, AbstractDisplayMode
 
-Provide detailed analysis of an optimization result.
+include("problem/RetroCache.jl")
+export RetroCache
 
-# Arguments
-- `result::RetroResult`: The optimization result to analyze
+# Then objective functions (which depend on cache)
+include("objective.jl")
+export ADObjectiveFunction, GradientObjectiveFunction, AnalyticObjectiveFunction,
+       objfunc!, gradient!, hessian!, value_and_gradient!, value_gradient_and_hessian!
 
-# Prints
-- Convergence status and reason
-- Final objective value and gradient norm
-- Iteration and evaluation counts
-- Efficiency metrics
-"""
-function analyze_result(result::RetroResult)
-    println("=== Retro Optimization Result ===")
-    println("Converged: $(result.converged)")
-    println("Convergence reason: $(result.termination_reason)")
-    println("Final objective value: $(result.fx)")
-    println("Final gradient norm (∞): $(norm(result.gx, Inf))")
-    println("Iterations: $(result.iterations)")
-    println("Function evaluations: $(result.function_evaluations)")
-    println("Gradient evaluations: $(result.gradient_evaluations)")  
-    println("Hessian evaluations: $(result.hessian_evaluations)")
-    
-    efficiency = result.iterations > 0 ? result.function_evaluations / result.iterations : 0.0
-    println("Average f-evals per iteration: $(round(efficiency, digits=2))")
-end
+# Problem definition
+include("problem/RetroProblem.jl")
+export RetroProblem
 
-end # module
+include("problem/RetroResult.jl")
+export RetroResult, is_successful
+
+# Hessian approximations
+include("hessian/BFGS.jl")
+include("hessian/SR1.jl")
+include("hessian/ExactHessian.jl")
+export BFGS, SR1, ExactHessian, init_hessian!, update_hessian!, apply_hessian!
+
+# Trust-region solvers (must come before subspace methods that dispatch on them)
+include("trsolver/EigenTRSolver.jl")
+include("trsolver/CauchyTRSolver.jl")
+include("trsolver/BrentTRSolver.jl")
+export EigenTRSolver, CauchyTRSolver, BrentTRSolver, solve_tr!
+
+# Subspace methods
+include("subspace/TwoDimSubspace.jl")
+include("subspace/CGSubspace.jl")
+include("subspace/FullSpace.jl")
+export TwoDimSubspace, CGSubspace, FullSpace, init_subspace!, build_subspace!, solve_subspace_tr!
+
+# Step computation and acceptance
+include("steps/Reflection.jl")
+export compute_scaling!, scale_gradient!, apply_reflective_bounds!, project_bounds!,
+       initialize_away_from_bounds!, find_step_to_bound, compute_cauchy_boundary_point!
+
+include("steps/StepAcceptance.jl")
+export predicted_reduction, actual_reduction, accept_step, update_trust_region_radius,
+       check_convergence, compute_cauchy_step!
+
+include("steps/TrustRegionStep.jl")
+export compute_trust_region_step!, compute_hv_product!, check_negative_curvature,
+       assess_model_quality
+
+# Utilities
+include("utils/LinearAlgebraHelpers.jl") 
+include("utils/Norms.jl")
+include("utils/Displays.jl")
+export safe_norm, safe_dot, safe_cond, is_positive_definite, smallest_eigenvalue,
+       norm_inf, norm_weighted, norm_relative, norm_scaled, trust_region_norm, gradient_norm,
+       Silent, Iteration, Final, Verbose, display_header, display_iteration, display_final
+
+# Main optimization routine
+include("optimize.jl")
+export RetroOptions, optimize
+
+end # module Retro
