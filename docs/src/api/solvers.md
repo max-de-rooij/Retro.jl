@@ -41,21 +41,8 @@ EigenTRSolver
 CauchyTRSolver
 ```
 
-## BrentTRSolver
-
-```@docs
-BrentTRSolver
-```
-
 ## Solve interface
 
 ```@docs
 solve_tr!
-```
-
-## Internal helpers
-
-```@docs
-Retro._secular_norm_sq
-Retro._brent_root_find
 ```

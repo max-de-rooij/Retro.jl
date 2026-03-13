@@ -1,6 +1,3 @@
-using LinearAlgebra
-using StaticArrays
-
 """
     TwoDimSubspace <: AbstractSubspace
 
@@ -44,7 +41,7 @@ end
 
 Initialise the subspace method, returning an opaque `state` object.
 """
-function init_subspace!(::TwoDimSubspace, cache::RetroCache{T}) where {T}
+function init_subspace!(::TwoDimSubspace, ::RetroCache{T}) where {T}
     return TwoDimSubspaceState{T}()
 end
 
@@ -186,13 +183,8 @@ function solve_tr_2d!(::CauchyTRSolver, g2d::SVector{2,T}, H2d::SMatrix{2,2,T,4}
     state.p2d = -α * g2d
 end
 
-# BrentTRSolver - use eigenvalue method for 2D (Brent's method is for 1D line search)
-function solve_tr_2d!(::BrentTRSolver, g2d::SVector{2,T}, H2d::SMatrix{2,2,T,4}, Δ::T, state) where {T}
-    _solve_tr_2d_eigen!(g2d, H2d, Δ, state)
-end
-
 # Fallback for any other solver type - use eigenvalue method
-function solve_tr_2d!(solver::AbstractTRSolver, g2d::SVector{2,T}, H2d::SMatrix{2,2,T,4}, Δ::T, state) where {T}
+function solve_tr_2d!(::AbstractTRSolver, g2d::SVector{2,T}, H2d::SMatrix{2,2,T,4}, Δ::T, state) where {T}
     _solve_tr_2d_eigen!(g2d, H2d, Δ, state)
 end
 

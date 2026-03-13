@@ -104,16 +104,13 @@ function optimize(
 ) where {OBJ<:AbstractObjectiveFunction, T<:AbstractVector}
 
     ET = eltype(x0)
-    
-    # Initialize workspace (cache)
+
     cache = RetroCache{ET}(length(x0))
-    
-    # Initialize states
+
     hessian_state = init_hessian!(hessian_approximation, cache)
     subspace_state = init_subspace!(subspace, cache)
-    
-    # Initialize current point
-    x = copy(x0)  # Make a copy to avoid modifying the original
+
+    x = copy(x0)
     
     # Move initial point away from bounds to avoid degeneracy
     if any(isfinite, prob.lb) || any(isfinite, prob.ub)
@@ -122,19 +119,16 @@ function optimize(
     
     Delta = options.initial_tr_radius
     
-    # Initialize display
     display_header(display)
     progress = RetroProgress(maxiter, display)
     
-    # Evaluate initial objective and gradient in one pass
     f_current = value_and_gradient!(cache.g, cache, prob.objective, x)
     g_norm = norm(cache.g)
     
-    # History tracking
     converged = false
     termination_reason = :maxiter
     consecutive_rejections = 0
-    f_change = zero(ET)               # absolute function change from last accepted step
+    f_change = zero(ET) 
     
     display_iteration(display, 0, f_current, g_norm, Delta, 0.0, "Initial")
     update_progress!(progress, 0, f_current, g_norm, "Starting")

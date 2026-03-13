@@ -1,5 +1,3 @@
-using LinearAlgebra
-
 """
 Main trust-region step computation interface.
 Coordinates between subspace methods, TR solvers, and bound constraints.

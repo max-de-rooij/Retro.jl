@@ -78,7 +78,7 @@ is_successful(result)  # true
 | **Bound constraints** | Coleman–Li reflective step with multiple reflections |
 | **Hessian strategies** | BFGS (damped), SR1, Exact Hessian via AD |
 | **Subspace solvers** | 2-D eigenvalue, Steihaug–Toint CG, full-space |
-| **TR solvers** | Eigenvalue, Cauchy, Brent line-search |
+| **TR solvers** | Eigenvalue, or Cauchy |
 | **AD backends** | Any backend via DifferentiationInterface (ForwardDiff, Enzyme, …) |
 | **Zero-allocation loops** | Pre-allocated `RetroCache` workspace |
 | **Display modes** | `Silent()`, `Iteration()`, `Final()`, `Verbose()` (with ProgressMeter) |

@@ -1,5 +1,3 @@
-using LinearAlgebra
-
 """
     CGSubspace <: AbstractSubspace
 
@@ -28,7 +26,7 @@ mutable struct CGSubspaceState{T<:Real}
 end
 
 # Initialize CGSubspace
-function init_subspace!(cg::CGSubspace{T}, cache::RetroCache{T}) where {T}
+function init_subspace!(::CGSubspace{T}, ::RetroCache{T}) where {T}
     return CGSubspaceState{T}()
 end
 
@@ -59,9 +57,12 @@ function build_subspace!(cg::CGSubspace{T}, state, cache::RetroCache{T}, hess_ap
         # Check for negative curvature
         dHd = dot(cache.d, cache.Hd)
         if dHd <= zero(T)
-            # Negative curvature detected, return current iterate
-            # TODO: handle negative curvature properly (boundary of TR)
-            break
+            # Negative curvature detected, terminate and move to TR boundary by solving ||p + τd||² = Δ²
+            # This can be solved for τ using the quadratic formula
+            dd = dot(cache.d, cache.d)
+            τ = (-dot(cache.p, cache.d) + sqrt(dot(cache.p, cache.d)^2 + dd * (cg.cg_tol^2 - dot(cache.p, cache.p)))) / dd
+            @. cache.p += τ * cache.d
+            return
         end
         
         # CG step
@@ -86,12 +87,11 @@ function build_subspace!(cg::CGSubspace{T}, state, cache::RetroCache{T}, hess_ap
         end
     end
     
-    # Negate to get the Newton direction (we solved H*p = g, want H*p = -g)
     @. cache.p = -cache.p
 end
 
 # For CG, the subspace solve is already done in build_subspace!
-function solve_subspace_tr!(solver, cg::CGSubspace{T}, state, cache::RetroCache{T}, Δ::T) where {T}
+function solve_subspace_tr!(solver, ::CGSubspace{T}, state, cache::RetroCache{T}, Δ::T) where {T}
     # CG already computed the step, just need to check trust-region constraint
     p_norm = norm(cache.p)
     

@@ -1,7 +1,3 @@
-using DifferentiationInterface
-using ADTypes: AbstractADType
-using LinearAlgebra
-
 """
     RetroProblem{OBJ<:AbstractObjectiveFunction, T<:AbstractVector}
 

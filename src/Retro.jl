@@ -1,10 +1,15 @@
 module Retro
 
-using Reexport
-@reexport using DifferentiationInterface
+using Reexport: @reexport
+using ADTypes: ADTypes, AbstractADType, AutoForwardDiff
+using DifferentiationInterface: DifferentiationInterface, prepare_gradient, prepare_hessian
+using LinearAlgebra: LinearAlgebra, I, Symmetric, cholesky, cond, dot, eigen, factorize, issuccess, ldiv!, mul!, norm
+using Printf: Printf, @printf
+using ProgressMeter: ProgressMeter, Progress
+using StaticArrays: StaticArrays, @SMatrix, @SVector, SMatrix, SVector, StaticVector
+
 @reexport using ADTypes
-@reexport using LinearAlgebra
-@reexport using StaticArrays
+@reexport using ForwardDiff
 
 # Core types and cache must come first
 include("types.jl")
@@ -35,8 +40,7 @@ export BFGS, SR1, ExactHessian, init_hessian!, update_hessian!, apply_hessian!
 # Trust-region solvers (must come before subspace methods that dispatch on them)
 include("trsolver/EigenTRSolver.jl")
 include("trsolver/CauchyTRSolver.jl")
-include("trsolver/BrentTRSolver.jl")
-export EigenTRSolver, CauchyTRSolver, BrentTRSolver, solve_tr!
+export EigenTRSolver, CauchyTRSolver, solve_tr!
 
 # Subspace methods
 include("subspace/TwoDimSubspace.jl")

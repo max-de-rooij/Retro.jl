@@ -1,5 +1,3 @@
-using LinearAlgebra
-
 """
 Reflective bounds handling for box-constrained optimization.
 

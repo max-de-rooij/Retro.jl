@@ -1,5 +1,3 @@
-using LinearAlgebra
-
 """
     CauchyTRSolver <: AbstractTRSolver
 
@@ -11,7 +9,7 @@ struct CauchyTRSolver <: AbstractTRSolver
 end
 
 # Solve trust-region subproblem using Cauchy point
-function solve_tr!(solver::CauchyTRSolver, g::AbstractVector{T}, H::AbstractMatrix{T}, Delta::T, p::AbstractVector{T}) where {T}
+function solve_tr!(::CauchyTRSolver, g::AbstractVector{T}, H::AbstractMatrix{T}, Delta::T, p::AbstractVector{T}) where {T}
     g_norm = norm(g)
     
     if g_norm < eps(T)

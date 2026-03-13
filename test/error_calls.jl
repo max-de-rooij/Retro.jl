@@ -1,6 +1,5 @@
 using Retro
 using Test
-using ForwardDiff
 
 @testset "Error Handling" begin
     @testset "Dimension Mismatches" begin

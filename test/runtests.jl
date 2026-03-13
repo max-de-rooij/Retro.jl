@@ -1,6 +1,5 @@
 using Retro
 using Test
-using ForwardDiff
 using LinearAlgebra
 using Random
 

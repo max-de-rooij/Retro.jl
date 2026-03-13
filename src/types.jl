@@ -30,8 +30,7 @@ abstract type AbstractSubspace end
 
 Supertype for trust-region subproblem solvers.
 
-Concrete subtypes: [`EigenTRSolver`](@ref), [`CauchyTRSolver`](@ref),
-[`BrentTRSolver`](@ref).
+Concrete subtypes: [`EigenTRSolver`](@ref), [`CauchyTRSolver`](@ref).
 """
 abstract type AbstractTRSolver end
 

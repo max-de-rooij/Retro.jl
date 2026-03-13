@@ -1,5 +1,3 @@
-using LinearAlgebra
-
 """
     SR1 <: AbstractHessianApproximation
 

@@ -1,5 +1,3 @@
-using LinearAlgebra
-
 """
 Trust-region step acceptance and radius update logic.
 """

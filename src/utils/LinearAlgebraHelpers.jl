@@ -1,5 +1,3 @@
-using LinearAlgebra
-
 """
 Linear algebra helper functions for trust-region optimization.
 """

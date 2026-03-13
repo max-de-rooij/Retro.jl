@@ -1,5 +1,3 @@
-using LinearAlgebra
-
 """
     EigenTRSolver <: AbstractTRSolver
 
@@ -23,11 +21,6 @@ EigenTRSolver(; kwargs...) = EigenTRSolver{Float64}(; kwargs...)
 # Secular equation helpers
 # ============================================================================
 
-"""
-    _secular_norm_sq(λ, g_eigen, σ, n) -> T
-
-Compute ``||p(σ)||^2 = \\sum_i (g_i / (λ_i + σ))^2`` from the eigendecomposition.
-"""
 function _secular_norm_sq(λ::AbstractVector{T}, g_eigen::AbstractVector{T}, σ::T, n::Int) where {T}
     norm_sq = zero(T)
     for i in 1:n
@@ -39,16 +32,6 @@ function _secular_norm_sq(λ::AbstractVector{T}, g_eigen::AbstractVector{T}, σ:
     return norm_sq
 end
 
-# ============================================================================
-# Brent root-finding  (van Wijngaarden–Dekker–Brent method)
-# ============================================================================
-
-"""
-    _brent_root_find(f, a, b, tol, max_iter) -> x
-
-Find a root of scalar function `f` in the bracket `[a, b]` using Brent's method.
-`f(a)` and `f(b)` must have opposite signs.
-"""
 function _brent_root_find(f, a::T, b::T, tol::T, max_iter::Int) where {T<:Real}
     fa = f(a)
     fb = f(b)

@@ -1,8 +1,3 @@
-using Printf
-using ProgressMeter
-
-# Display modes
-
 """
     Silent <: AbstractDisplayMode
 

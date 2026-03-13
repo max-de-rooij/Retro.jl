@@ -1,6 +1,3 @@
-using DifferentiationInterface
-using LinearAlgebra
-
 """
     ADObjectiveFunction{F,ADT,PG,PH} <: AbstractObjectiveFunction
 
@@ -98,17 +95,17 @@ end
 
 Compute the gradient of `obj` at `x` and store it in `g` (in-place).
 """
-function gradient!(g, cache::RetroCache, obj::ADObjectiveFunction, x)
+function DifferentiationInterface.gradient!(g, cache::RetroCache, obj::ADObjectiveFunction, x)
     cache.g_calls += 1
     DifferentiationInterface.gradient!(obj.func, g, obj.prep_g, obj.adtype, x)
 end
 
-function gradient!(g, cache::RetroCache, obj::GradientObjectiveFunction, x)
+function DifferentiationInterface.gradient!(g, cache::RetroCache, obj::GradientObjectiveFunction, x)
     cache.g_calls += 1
     obj.grad!(g, x)
 end
 
-function gradient!(g, cache::RetroCache, obj::AnalyticObjectiveFunction, x)
+function DifferentiationInterface.gradient!(g, cache::RetroCache, obj::AnalyticObjectiveFunction, x)
     cache.g_calls += 1
     obj.grad!(g, x)
 end
@@ -121,14 +118,14 @@ end
 Compute objective value and gradient simultaneously.  Returns the scalar
 objective value; the gradient is written to `g`.
 """
-function value_and_gradient!(g, cache::RetroCache, obj::ADObjectiveFunction, x)
+function DifferentiationInterface.value_and_gradient!(g, cache::RetroCache, obj::ADObjectiveFunction, x)
     cache.f_calls += 1
     cache.g_calls += 1
     val, _ = DifferentiationInterface.value_and_gradient!(obj.func, g, obj.prep_g, obj.adtype, x)
     return val
 end
 
-function value_and_gradient!(g, cache::RetroCache, obj::GradientObjectiveFunction, x)
+function DifferentiationInterface.value_and_gradient!(g, cache::RetroCache, obj::GradientObjectiveFunction, x)
     cache.f_calls += 1
     cache.g_calls += 1
     val = obj.func(x)
@@ -136,7 +133,7 @@ function value_and_gradient!(g, cache::RetroCache, obj::GradientObjectiveFunctio
     return val
 end
 
-function value_and_gradient!(g, cache::RetroCache, obj::AnalyticObjectiveFunction, x)
+function DifferentiationInterface.value_and_gradient!(g, cache::RetroCache, obj::AnalyticObjectiveFunction, x)
     cache.f_calls += 1
     cache.g_calls += 1
     val = obj.func(x)
@@ -151,17 +148,17 @@ end
 
 Compute the Hessian of `obj` at `x` and store it in the matrix `H` (in-place).
 """
-function hessian!(H, cache::RetroCache, obj::ADObjectiveFunction, x)
+function DifferentiationInterface.hessian!(H, cache::RetroCache, obj::ADObjectiveFunction, x)
     cache.h_calls += 1
     DifferentiationInterface.hessian!(obj.func, H, obj.prep_h, obj.adtype, x)
 end
 
-function hessian!(H, cache::RetroCache, obj::GradientObjectiveFunction, x)
+function DifferentiationInterface.hessian!(H, cache::RetroCache, obj::GradientObjectiveFunction, x)
     cache.h_calls += 1
     DifferentiationInterface.hessian!(obj.func, H, obj.prep_h, obj.adtype, x)
 end
 
-function hessian!(H, cache::RetroCache, obj::AnalyticObjectiveFunction, x)
+function DifferentiationInterface.hessian!(H, cache::RetroCache, obj::AnalyticObjectiveFunction, x)
     cache.h_calls += 1
     obj.hess!(H, x)
 end
@@ -174,7 +171,7 @@ end
 Compute objective value, gradient, and Hessian simultaneously.
 Returns the scalar objective value; `g` and `H` are written in-place.
 """
-function value_gradient_and_hessian!(g, H, cache::RetroCache, obj::ADObjectiveFunction, x)
+function DifferentiationInterface.value_gradient_and_hessian!(g, H, cache::RetroCache, obj::ADObjectiveFunction, x)
     cache.f_calls += 1
     cache.g_calls += 1
     cache.h_calls += 1
@@ -184,7 +181,7 @@ function value_gradient_and_hessian!(g, H, cache::RetroCache, obj::ADObjectiveFu
     return val
 end
 
-function value_gradient_and_hessian!(g, H, cache::RetroCache, obj::GradientObjectiveFunction, x)
+function DifferentiationInterface.value_gradient_and_hessian!(g, H, cache::RetroCache, obj::GradientObjectiveFunction, x)
     cache.f_calls += 1
     cache.g_calls += 1
     cache.h_calls += 1
@@ -194,7 +191,7 @@ function value_gradient_and_hessian!(g, H, cache::RetroCache, obj::GradientObjec
     return val
 end
 
-function value_gradient_and_hessian!(g, H, cache::RetroCache, obj::AnalyticObjectiveFunction, x)
+function DifferentiationInterface.value_gradient_and_hessian!(g, H, cache::RetroCache, obj::AnalyticObjectiveFunction, x)
     cache.f_calls += 1
     cache.g_calls += 1
     cache.h_calls += 1

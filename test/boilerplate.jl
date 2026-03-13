@@ -1,6 +1,5 @@
 using Retro
 using Test
-using ForwardDiff
 using LinearAlgebra
 
 @testset "Package Structure" begin
@@ -79,7 +78,6 @@ end
     @testset "FullSpace" begin
         fs = FullSpace()
         @test fs isa FullSpace
-        @test fs.static_threshold == 10
     end
 end
 
@@ -93,14 +91,7 @@ end
     @testset "CauchyTRSolver" begin
         solver = CauchyTRSolver()
         @test solver isa CauchyTRSolver
-    end
-    
-    @testset "BrentTRSolver" begin
-        solver = BrentTRSolver()
-        @test solver isa BrentTRSolver
-        @test solver.max_iter == 50
-        @test solver.tol == 1e-8
-    end
+    end  
 end
 
 @testset "Hessian Approximations" begin

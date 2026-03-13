@@ -113,14 +113,6 @@ using LinearAlgebra
                             tr_solver=CauchyTRSolver())
             @test result isa RetroResult
         end
-        
-        @testset "BrentTRSolver" begin
-            result = optimize(prob;
-                            maxiter=100,
-                            display=Silent(),
-                            tr_solver=BrentTRSolver())
-            @test result isa RetroResult
-        end
     end
     
     @testset "Bounded Rosenbrock" begin

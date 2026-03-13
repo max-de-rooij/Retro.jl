@@ -1,6 +1,3 @@
-using LinearAlgebra
-using StaticArrays
-
 """
     RetroCache{T<:Real}
 

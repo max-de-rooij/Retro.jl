@@ -29,8 +29,7 @@ src/
 │
 ├── trsolver/
 │   ├── EigenTRSolver.jl     # Eigenvalue TR solver (Newton → Brent → Cauchy)
-│   ├── CauchyTRSolver.jl    # Cauchy (steepest descent) point
-│   └── BrentTRSolver.jl     # Brent line search along a direction
+│   └── CauchyTRSolver.jl    # Cauchy (steepest descent) point
 │
 ├── steps/
 │   ├── Reflection.jl        # Coleman–Li reflective bounds
@@ -63,8 +62,7 @@ AbstractSubspace
 
 AbstractTRSolver
 ├── EigenTRSolver
-├── CauchyTRSolver
-└── BrentTRSolver
+└── CauchyTRSolver
 
 AbstractDisplayMode
 ├── Silent
@@ -113,7 +111,7 @@ Retro uses **Julia's multiple dispatch** extensively:
 * The *Hessian approximation* type controls how `update_hessian!`,
   `apply_hessian!`, and `solve_newton_direction!` behave.
 * The *subspace* type controls `build_subspace!` and `solve_subspace_tr!`.
-* The *TR solver* type controls the inner eigenvalue / Cauchy / Brent solver
+* The *TR solver* type controls the inner eigenvalue / Cauchy / solver
   via `solve_tr!` and `solve_tr_2d!`.
 * The *objective* type controls whether gradient / Hessian calls hit AD or
   user functions.

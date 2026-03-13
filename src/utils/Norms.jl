@@ -1,5 +1,3 @@
-using LinearAlgebra
-
 """
 Specialized norm computations for trust-region optimization.
 """

@@ -1,5 +1,3 @@
-using LinearAlgebra
-
 """
     ExactHessian{T} <: AbstractHessianApproximation
 

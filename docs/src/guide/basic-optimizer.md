@@ -17,20 +17,17 @@ where ``\alpha > 0`` is a step size.
 Gradient descent is simple, but it has well-known failure modes:
 
 * **Step-size dilemma** — too large and you overshoot; too small and you
-  converge glacially.  The *optimal* ``\alpha`` depends on local curvature, which
-  changes at every point.
+  converge glacially.  The *optimal* ``\alpha`` depends on local curvature, which changes at every point.
 * **Zig-zagging** — in narrow valleys (like the Rosenbrock function) the
   gradient is nearly perpendicular to the valley floor, so the iterates
   bounce back and forth making almost no progress.
-* **No curvature information** — the gradient tells you *direction* but not
-  *how far* the linear approximation is valid.
+* **No curvature information** — the gradient tells you *direction* but not *how far* the linear approximation is valid.
 
-```
-        ┌──────────────────┐
-        │  ╲  ╱  ╲  ╱      │   ← zig-zag in a narrow valley
-        │   ╲╱    ╲╱       │
-        │    ·─────→ ★     │   ← actual path to minimum
-        └──────────────────┘
+```@raw html
+<div style="text-align: center;">
+    <img src="../assets/grad.svg" alt="Gradient descent zig-zagging in a narrow valley" width="400">
+    <p style="font-size: 0.9em; color: #555;">Gradient descent zig-zagging in a narrow valley</p>
+</div>
 ```
 
 ## The idea
